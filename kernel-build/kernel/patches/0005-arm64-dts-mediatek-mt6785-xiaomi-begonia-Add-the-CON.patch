@@ -1,7 +1,7 @@
 From fa4e08513379a5d00a36d56077b6f4975472a257 Mon Sep 17 00:00:00 2001
 From: Begonia <begonia@localhost>
 Date: Thu, 12 Nov 2026 14:29:22 +0100
-Subject: [PATCH 05/18] arm64: dts: mediatek: mt6785-xiaomi-begonia: Add the
+Subject: [PATCH 05/22] arm64: dts: mediatek: mt6785-xiaomi-begonia: Add the
  CONNSYS and WiFi nodes
 
 The combo chip (WiFi/Bluetooth/GPS) inside the SoC needs its register

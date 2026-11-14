@@ -1,7 +1,7 @@
 From fd6b44013e925d1f5f898f2ce41fc482ad65d39e Mon Sep 17 00:00:00 2001
 From: Begonia <begonia@localhost>
 Date: Fri, 13 Nov 2026 22:43:24 +0100
-Subject: [PATCH 17/18] staging: Add the gen4m WLAN driver ported to Linux 6.16
+Subject: [PATCH 17/22] staging: Add the gen4m WLAN driver ported to Linux 6.16
  for MT6785
 
 Import connectivity/wlan/core/gen4m from MiCode/MTK_kernel_modules

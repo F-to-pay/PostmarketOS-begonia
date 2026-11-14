@@ -1,7 +1,7 @@
 From 51ac74981ee5ff3f3b83cbf0acef20ef3fe77651 Mon Sep 17 00:00:00 2001
 From: Begonia <begonia@localhost>
 Date: Thu, 12 Nov 2026 14:28:44 +0100
-Subject: [PATCH 04/18] arm64: dts: mediatek: mt6785-xiaomi-begonia: Add the
+Subject: [PATCH 04/22] arm64: dts: mediatek: mt6785-xiaomi-begonia: Add the
  battery and fuel gauge
 
 Describe the 4500 mAh battery (simple-battery, OCV table from the vendor

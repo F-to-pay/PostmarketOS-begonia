@@ -1,7 +1,7 @@
 From bbacb35bd9351759807fe23de002bce37ff21289 Mon Sep 17 00:00:00 2001
 From: Begonia <begonia@localhost>
 Date: Thu, 12 Nov 2026 14:31:00 +0100
-Subject: [PATCH 07/18] Input: novatek-nvt-ts - Make probing reliable on the
+Subject: [PATCH 07/22] Input: novatek-nvt-ts - Make probing reliable on the
  Redmi Note 8 Pro
 
 The controller is not always ready when its supply was only just enabled

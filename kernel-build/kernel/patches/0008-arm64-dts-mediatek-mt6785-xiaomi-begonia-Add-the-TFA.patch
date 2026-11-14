@@ -1,7 +1,7 @@
 From a6d9adf11c31f12261707160a3638b34d356562e Mon Sep 17 00:00:00 2001
 From: Begonia <begonia@localhost>
 Date: Thu, 12 Nov 2026 17:50:29 +0100
-Subject: [PATCH 08/18] arm64: dts: mediatek: mt6785-xiaomi-begonia: Add the
+Subject: [PATCH 08/22] arm64: dts: mediatek: mt6785-xiaomi-begonia: Add the
  TFA9874 speaker amplifier
 
 i2c6 (GPIO45/46), the nxp,tfa9874 SmartPA at 0x34 (reset GPIO24, irq GPIO69)

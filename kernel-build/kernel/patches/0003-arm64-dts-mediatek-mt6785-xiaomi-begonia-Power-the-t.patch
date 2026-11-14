@@ -1,7 +1,7 @@
 From 1829a9d25a7a17849fa704e6f70dce483f4794de Mon Sep 17 00:00:00 2001
 From: Begonia <begonia@localhost>
 Date: Thu, 12 Nov 2026 14:28:27 +0100
-Subject: [PATCH 03/18] arm64: dts: mediatek: mt6785-xiaomi-begonia: Power the
+Subject: [PATCH 03/22] arm64: dts: mediatek: mt6785-xiaomi-begonia: Power the
  touchscreen and fix proximity level
 
 The touch controller is supplied by the MT6360 "vtp" LDO, which the

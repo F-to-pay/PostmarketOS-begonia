@@ -1,7 +1,7 @@
 From 23494f781462b2f8356748c85d816731e4dcf672 Mon Sep 17 00:00:00 2001
 From: Begonia <begonia@localhost>
 Date: Thu, 12 Nov 2026 17:18:43 +0100
-Subject: [PATCH 02/18] power: supply: mt6360_charger: Follow the USB source
+Subject: [PATCH 02/22] power: supply: mt6360_charger: Follow the USB source
  current and battery limits
 
 BC1.2 detection reports a USB-C/PD source as SDP, which leaves the input

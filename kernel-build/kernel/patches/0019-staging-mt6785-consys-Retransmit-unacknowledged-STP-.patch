@@ -1,0 +1,203 @@
+From 77b37a3e5a6391cb73989ec3b96e67a61b7677e9 Mon Sep 17 00:00:00 2001
+From: Begonia <begonia@localhost>
+Date: Sat, 14 Nov 2026 12:10:27 +0100
+Subject: [PATCH 19/22] staging: mt6785-consys: Retransmit unacknowledged STP
+ frames
+
+A chunk of an STP frame written to BTIF can get lost (the first large HCI
+commands after boot, WiFi power-save transitions), after which the MCU
+parser waits for the rest of a half-received frame and ignores everything
+we send. Without retransmission the WMT/BT channel then stays dead until
+the next power cycle of CONNSYS, so toggling WiFi/Bluetooth could break
+them for good.
+
+Keep every sent frame in a queue until the MCU acknowledges it. If there
+is no ack for 180 ms, send the 0x7f 0x7f 0x7f 0x7f resync pattern and
+resend all unacknowledged frames, like the vendor stp_do_tx_timeout().
+The transmit window now counts unacknowledged frames instead of deriving
+them from the last ack seen, which was wrong right after start.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Signed-off-by: Begonia <begonia@localhost>
+---
+ .../staging/mt6785-consys/consys-bringup.c    | 91 +++++++++++++++++--
+ 1 file changed, 83 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/staging/mt6785-consys/consys-bringup.c b/drivers/staging/mt6785-consys/consys-bringup.c
+index 15223ba2c..67ea22061 100755
+--- a/drivers/staging/mt6785-consys/consys-bringup.c
++++ b/drivers/staging/mt6785-consys/consys-bringup.c
+@@ -217,6 +217,8 @@ struct consys {
+ 	void (*type_cb[8])(void *ctx, const u8 *buf, int len);	/* receivers of STP frames by type (GPS=2 etc.) */
+ 	void *type_ctx[8];
+ 	struct mutex txlock;		/* serializes the transmission of frames and ACKs over BTIF */
++	u8 *txq;			/* STP retransmit queue: 8 slots of STP_TXQ_SLOT bytes, indexed by the frame seq */
++	u16 txqlen[8];
+ 	struct sk_buff *rx_skb;		/* assembling H4 packets */
+ 	void __iomem *mcu;		/* CONN_MCU_CONFIG_BASE  0x18002000 */
+ 	void __iomem *top_misc_off;	/* CONN_TOP_MISC_OFF     0x180b1000 */
+@@ -974,13 +976,69 @@ struct stp_full {
+ 	u8 txack;	/* seq of the last frame received from the MCU */
+ 	u8 rxexp;	/* expected seq of the next frame from the MCU */
+ 	u8 rxack;	/* the last ack that came from the MCU (transmit window) */
++	u8 nunack;	/* frames sent and not yet acknowledged by the MCU (they sit in c->txq) */
++	u8 retries;	/* consecutive retransmissions without progress */
++	unsigned long tx_deadline;	/* jiffies: resend the unacknowledged frames after this */
+ 	int rxn;	/* bytes in rxbuf (the remainder between recv calls) */
+ 	u8 rxbuf[1024];	/* max. STP frame ~460 B (calibration event 0x1c6) + header/CRC */
+ };
+ 
+ #define STP_MAX_PAYLOAD	1100
++#define STP_TXQ_SLOT	(4 + STP_MAX_PAYLOAD + 2)
++#define STP_RETRY_MS	180	/* vendor MTKSTP_TX_TIMEOUT */
++#define STP_RETRY_FAST	10	/* vendor MTKSTP_RETRY_LIMIT: after that keep trying, but slowly */
+ static bool stp_quiet;	/* true while hci0 runs: do not clutter dmesg with a per-frame log */
+ 
++/*
++ * STP retransmit (vendor stp_core.c: stp_process_rxack / stp_do_tx_timeout). Every frame we send stays in c->txq until the MCU
++ * acknowledges it. If a chunk of a frame is lost on the way (BTIF write while the MCU is waking up from sleep, WiFi toggling
++ * at the same time...), the MCU parser sits in the middle of a half-received frame and ignores everything after it forever:
++ * without this the BT link (and the WMT channel) stays dead until the next power cycle of CONNSYS.
++ */
++static void stp_tx_acked(struct consys *c, struct stp_full *st, u8 ack)
++{
++	u8 n;
++
++	mutex_lock(&c->txlock);
++	n = ((ack - (st->txseq - st->nunack)) & 7) + 1;	/* frames acknowledged by `ack` (>nunack: stale/duplicate ack) */
++	if (st->nunack && n <= st->nunack) {
++		st->nunack -= n;
++		st->retries = 0;
++		st->tx_deadline = jiffies + msecs_to_jiffies(STP_RETRY_MS);
++	}
++	mutex_unlock(&c->txlock);
++}
++
++/* no ack for STP_RETRY_MS: 4x 0x7f (resync: the MCU drops a half-received frame), then resend all unacknowledged frames */
++static void stp_tx_retry(struct consys *c, struct stp_full *st)
++{
++	static const u8 resync[4] = { 0x7f, 0x7f, 0x7f, 0x7f };
++	u8 s, n;
++
++	if (!st->nunack || time_before(jiffies, st->tx_deadline))
++		return;
++	mutex_lock(&c->txlock);
++	if (!st->nunack || time_before(jiffies, st->tx_deadline)) {
++		mutex_unlock(&c->txlock);
++		return;
++	}
++	st->retries++;
++	st->tx_deadline = jiffies + msecs_to_jiffies(STP_RETRY_MS * (st->retries > STP_RETRY_FAST ? 10 : 1));
++	dev_warn_ratelimited(c->dev, "[STP-FULL] no ack: resync + resend %u frame(s) from seq %u (try %u, MCU ack=%u)\n", st->nunack,
++			     (st->txseq - st->nunack) & 7, st->retries, st->rxack);
++	btif_wake(c);
++	btif_tx(c, resync, sizeof(resync));
++	for (n = st->nunack, s = (st->txseq - n) & 7; n; n--, s = (s + 1) & 7) {
++		u8 *f = c->txq + s * STP_TXQ_SLOT;
++
++		f[0] = (f[0] & ~7) | st->txack;		/* fresh ack of the frames received from the MCU; CRC covers the payload only */
++		f[3] = (f[0] + f[1] + f[2]) & 0xff;
++		btif_wake(c);
++		btif_tx(c, f, c->txqlen[s]);
++	}
++	mutex_unlock(&c->txlock);
++}
++
+ static int stp_full_send(struct consys *c, struct stp_full *st, u8 type, const u8 *pl, int len)
+ {
+ 	u8 tx[4 + STP_MAX_PAYLOAD + 2];
+@@ -1001,6 +1059,14 @@ static int stp_full_send(struct consys *c, struct stp_full *st, u8 type, const u
+ 	if (!stp_quiet)
+ 		dev_info(c->dev, "[STP-FULL] TX seq=%u ack=%u type=%u len=%d: %*ph\n", st->txseq, st->txack, type, len,
+ 			 min(6 + len, 32), tx);
++	if (c->txq) {
++		memcpy(c->txq + st->txseq * STP_TXQ_SLOT, tx, 6 + len);
++		c->txqlen[st->txseq] = 6 + len;
++		if (!st->nunack)
++			st->tx_deadline = jiffies + msecs_to_jiffies(STP_RETRY_MS);
++		if (st->nunack < 7)
++			st->nunack++;
++	}
+ 	st->txseq = (st->txseq + 1) & 7;
+ 	btif_wake(c);
+ 	ret = btif_tx(c, tx, 6 + len);
+@@ -1048,6 +1114,7 @@ static int stp_full_recv_t(struct consys *c, struct stp_full *st, int want_type,
+ 			type = (h[1] >> 4) & 7;
+ 			len = ((h[1] & 0x0f) << 8) | h[2];
+ 			st->rxack = ack;
++			stp_tx_acked(c, st, ack);
+ 			if (!len) {			/* header-only: ACK of our frame */
+ 				if (!stp_quiet)
+ 					dev_info(c->dev, "[STP-FULL] RX ack=%d (header only)\n", ack);
+@@ -1090,11 +1157,14 @@ static int stp_full_recv_t(struct consys *c, struct stp_full *st, int want_type,
+ 		if (!time_before(jiffies, deadline))
+ 			break;
+ 		{
++			/* wait in slices so that a lost frame can be resent while we wait for the answer */
+ 			int got = btif_rx(c, buf + st->rxn, sizeof(st->rxbuf) - st->rxn,
+-					  jiffies_to_msecs(deadline - jiffies), 2000);
++					  min_t(unsigned int, jiffies_to_msecs(deadline - jiffies), 50), 2000);
+ 
+-			if (!got)
+-				break;
++			if (!got) {
++				stp_tx_retry(c, st);
++				continue;	/* the deadline is checked at the top of the loop */
++			}
+ 			st->rxn += got;
+ 			if (!stp_quiet)
+ 				dev_info(c->dev, "[STP-FULL] RX +%d (total %d): %*ph\n", got, st->rxn, min(st->rxn, 40), buf);
+@@ -1313,6 +1383,7 @@ static void stp_rx_process(struct consys *c)
+ 		type = (h[1] >> 4) & 7;
+ 		len = ((h[1] & 0x0f) << 8) | h[2];
+ 		st->rxack = ack;
++		stp_tx_acked(c, st, ack);
+ 		if (!len) {
+ 			pos += 4;
+ 			continue;
+@@ -1395,6 +1466,7 @@ static int consys_rx_thread(void *data)
+ 			stp_rx_process(c);
+ 			continue;		/* while there is data - do not sleep */
+ 		}
++		stp_tx_retry(c, st);
+ 		{
+ 			unsigned int us = rx_poll_us ? rx_poll_us : 50;
+ 
+@@ -1493,10 +1565,10 @@ static int consys_stp_send_c(struct consys *c, u8 type, const u8 *buf, int len)
+ 
+ 	if (!st || !c->rx_task)
+ 		return -ENODEV;
+-	for (i = 0; i < 300 && ((st->txseq - ((st->rxack + 1) & 7)) & 7) >= 4; i++)
++	for (i = 0; i < 300 && st->nunack >= 4; i++)
+ 		usleep_range(1000, 2000);
+ 	if (i == 300)
+-		dev_warn_ratelimited(c->dev, "STP tx window stuck (txseq=%u rxack=%u)\n", st->txseq, st->rxack);
++		dev_warn_ratelimited(c->dev, "STP tx window stuck (unacked=%u txseq=%u rxack=%u)\n", st->nunack, st->txseq, st->rxack);
+ 	return stp_full_send(c, st, type, buf, len);
+ }
+ 
+@@ -1685,11 +1757,11 @@ static int consys_hci_send(struct hci_dev *hdev, struct sk_buff *skb)
+ 	}
+ 	buf[0] = hci_skb_pkt_type(skb);
+ 	memcpy(buf + 1, skb->data, skb->len);
+-	/* STP window: no more than 4 unacknowledged frames (retransmit is not implemented) */
+-	for (i = 0; i < 300 && ((st->txseq - ((st->rxack + 1) & 7)) & 7) >= 4; i++)
++	/* STP window: no more than 4 unacknowledged frames (the rx thread resends them if the MCU is silent) */
++	for (i = 0; i < 300 && st->nunack >= 4; i++)
+ 		usleep_range(1000, 2000);
+ 	if (i == 300)
+-		dev_warn_ratelimited(c->dev, "STP tx window stuck (txseq=%u rxack=%u)\n", st->txseq, st->rxack);
++		dev_warn_ratelimited(c->dev, "STP tx window stuck (unacked=%u txseq=%u rxack=%u)\n", st->nunack, st->txseq, st->rxack);
+ 	ret = stp_full_send(c, st, 0, buf, skb->len + 1);
+ 	switch (hci_skb_pkt_type(skb)) {
+ 	case HCI_COMMAND_PKT: hdev->stat.cmd_tx++; break;
+@@ -2418,6 +2490,9 @@ static int consys_probe(struct platform_device *pdev)
+ 	if (!c)
+ 		return -ENOMEM;
+ 	mutex_init(&c->txlock);
++	c->txq = devm_kmalloc(dev, 8 * STP_TXQ_SLOT, GFP_KERNEL);
++	if (!c->txq)
++		return -ENOMEM;
+ 	mutex_init(&c->rx_lock);
+ 	mutex_init(&c->wmt_lock);
+ 	init_completion(&c->wmt_done);

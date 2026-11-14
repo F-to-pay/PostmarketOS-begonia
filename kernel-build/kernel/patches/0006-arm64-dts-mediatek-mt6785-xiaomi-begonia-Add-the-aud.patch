@@ -1,7 +1,7 @@
 From b4de2ab92dca384c2ca5711343ac14f5724cc559 Mon Sep 17 00:00:00 2001
 From: Begonia <begonia@localhost>
 Date: Thu, 12 Nov 2026 14:29:23 +0100
-Subject: [PATCH 06/18] arm64: dts: mediatek: mt6785-xiaomi-begonia: Add the
+Subject: [PATCH 06/22] arm64: dts: mediatek: mt6785-xiaomi-begonia: Add the
  audio front end and sound card
 
 Nodes for the AFE (audio-controller under audsys), its pin states and the

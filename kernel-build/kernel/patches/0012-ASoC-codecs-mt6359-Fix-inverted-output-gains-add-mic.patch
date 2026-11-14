@@ -1,7 +1,7 @@
 From 2730b35273b434fc9a82ac17425f869dd71b2ec8 Mon Sep 17 00:00:00 2001
 From: Begonia <begonia@localhost>
 Date: Fri, 13 Nov 2026 22:43:23 +0100
-Subject: [PATCH 12/18] ASoC: codecs: mt6359: Fix inverted output gains, add
+Subject: [PATCH 12/22] ASoC: codecs: mt6359: Fix inverted output gains, add
  mic type overrides
 
 The hardware gain codes of the HP/LINEOUT/HS stages decrease with volume

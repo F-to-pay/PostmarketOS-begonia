@@ -1,0 +1,68 @@
+From 1e818ed66b45dc646b0866935ace546aef2d6ad6 Mon Sep 17 00:00:00 2001
+From: Begonia <begonia@localhost>
+Date: Sat, 14 Nov 2026 13:56:00 +0100
+Subject: [PATCH 22/22] iio: imu: bmi160: Read consecutive channels with one
+ bulk read
+
+The trigger handler issued one two-byte regmap read per active channel.
+With all gyroscope and accelerometer axes enabled that is six SPI
+messages per sample, and on SoCs whose SPI controller uses runtime PM
+each message wakes the controller up and puts it to sleep again (about
+150 resume/suspend cycles per second at 25 samples per second on the
+Redmi Note 8 Pro, touching the pin controller and the clock controller
+every time).
+
+The sample registers are contiguous, so read every run of consecutive
+active channels with a single bulk read.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Signed-off-by: Begonia <begonia@localhost>
+---
+ drivers/iio/imu/bmi160/bmi160_core.c | 30 +++++++++++++++++++++++-----
+ 1 file changed, 25 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/iio/imu/bmi160/bmi160_core.c b/drivers/iio/imu/bmi160/bmi160_core.c
+index 0423ef6f9..be952e8af 100644
+--- a/drivers/iio/imu/bmi160/bmi160_core.c
++++ b/drivers/iio/imu/bmi160/bmi160_core.c
+@@ -432,15 +432,35 @@ static irqreturn_t bmi160_trigger_handler(int irq, void *p)
+ 	struct iio_poll_func *pf = p;
+ 	struct iio_dev *indio_dev = pf->indio_dev;
+ 	struct bmi160_data *data = iio_priv(indio_dev);
+-	int i, ret, j = 0, base = BMI160_REG_DATA_MAGN_XOUT_L;
+-	__le16 sample;
++	int i, ret, j = 0, first = -1, n = 0;
++	const int base = BMI160_REG_DATA_MAGN_XOUT_L;
+ 
++	/*
++	 * The sample registers of all channels are contiguous. Read every run of
++	 * consecutive active channels with one bulk read: with all the gyroscope and
++	 * accelerometer axes enabled that is one 12 byte transfer instead of six
++	 * 2 byte ones, each of which wakes up and puts to sleep the SPI controller.
++	 */
+ 	iio_for_each_active_channel(indio_dev, i) {
+-		ret = regmap_bulk_read(data->regmap, base + i * sizeof(sample),
+-				       &sample, sizeof(sample));
++		if (n && i == first + n) {
++			n++;
++			continue;
++		}
++		if (n) {
++			ret = regmap_bulk_read(data->regmap, base + first * sizeof(__le16),
++					       &data->buf[j], n * sizeof(__le16));
++			if (ret)
++				goto done;
++			j += n;
++		}
++		first = i;
++		n = 1;
++	}
++	if (n) {
++		ret = regmap_bulk_read(data->regmap, base + first * sizeof(__le16),
++				       &data->buf[j], n * sizeof(__le16));
+ 		if (ret)
+ 			goto done;
+-		data->buf[j++] = sample;
+ 	}
+ 
+ 	iio_push_to_buffers_with_timestamp(indio_dev, data->buf, pf->timestamp);

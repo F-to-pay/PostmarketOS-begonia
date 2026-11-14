@@ -1,0 +1,163 @@
+From d11360cb873352658cf0032fd2f817a5d8ea1ef1 Mon Sep 17 00:00:00 2001
+From: Begonia <begonia@localhost>
+Date: Sat, 14 Nov 2026 13:23:38 +0100
+Subject: [PATCH 21/22] staging: mt6785-consys: Sleep on the BTIF RX interrupt
+ instead of polling
+
+The receive thread woke up every 1-2 ms (about 500 wakeups per second while
+Bluetooth is on) just to look at the BTIF FIFO / the RX DMA ring. When there
+is nothing to read, unmask the RX interrupt (BTIF IER bit 0, or the AP_DMA RX
+channel when RX DMA is on), sleep on a waitqueue, and mask the level
+interrupt in the handler until the thread has emptied the buffer again. While
+frames are unacknowledged the thread still wakes up in time for the STP
+retransmission, and with RX DMA a 100 ms safety timeout remains. Without
+interrupts in the DT, or with rx_irq=0, the old polling is used.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Signed-off-by: Begonia <begonia@localhost>
+---
+ .../staging/mt6785-consys/consys-bringup.c    | 78 +++++++++++++++++++
+ 1 file changed, 78 insertions(+)
+
+diff --git a/drivers/staging/mt6785-consys/consys-bringup.c b/drivers/staging/mt6785-consys/consys-bringup.c
+index 67ea22061..a21b4ef3b 100755
+--- a/drivers/staging/mt6785-consys/consys-bringup.c
++++ b/drivers/staging/mt6785-consys/consys-bringup.c
+@@ -32,6 +32,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/fs.h>
+ #include <linux/fcntl.h>
++#include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/module.h>
+@@ -122,6 +123,7 @@
+ #define BTIF_WAK			0x64
+ #define BTIF_HANDSHAKE			0x6c
+ #define BTIF_LSR_DR			BIT(0)
++#define BTIF_IER_RXFEN			BIT(0)	/* interrupt: the RX buffer contains data */
+ #define BTIF_LSR_THRE			BIT(5)
+ #define BTIF_LSR_TEMT			BIT(6)
+ /* AP_DMA BTIF RX channel (vendor DT: rx-dma 0x11000c00): the same register device, the ring in RAM is written by DMA, read by the host */
+@@ -236,6 +238,12 @@ struct consys {
+ 	dma_addr_t rvff_phys;
+ 	u32 rx_rpt;			/* our read pointer (with the 0x10000 wrap bit) */
+ 	bool rxdma_on;
++	int irq;			/* BTIF interrupt (GIC SPI 138) from DT, 0 = none -> polling */
++	int irq_dma;			/* AP_DMA BTIF RX channel interrupt (GIC SPI 154) from DT, used while RX DMA is on */
++	int rx_irq_line;		/* the one that is requested while the receive thread runs */
++	bool rx_irq_on;			/* the receive thread sleeps on rx_wq and is woken by the BTIF/RX DMA interrupt */
++	bool rx_ev;
++	wait_queue_head_t rx_wq;
+ 	struct clk *clk_btif;
+ 	struct clk *clk_apdma;
+ 	u32 pda_addr;
+@@ -1440,6 +1448,24 @@ static void stp_rx_process(struct consys *c)
+ }
+ 
+ /* simple BTIF polling: while empty - sleep rx_poll_us..2x (TODO: BTIF IRQ, SPI 138) */
++static bool rx_irq = true;
++module_param(rx_irq, bool, 0444);
++MODULE_PARM_DESC(rx_irq, "wait for the BTIF RX interrupt instead of polling every rx_poll_us (needs interrupts in the DT node)");
++
++/* the level interrupt is masked here and unmasked by the receive thread after it has drained the FIFO */
++static irqreturn_t consys_btif_irq(int irq, void *data)
++{
++	struct consys *c = data;
++
++	if (c->rxdma_on)
++		writel(0, c->rxdma + ADMA_INT_EN);	/* RX DMA: data landed in the vFIFO */
++	else
++		writel(0, c->btif + BTIF_IER);
++	WRITE_ONCE(c->rx_ev, true);
++	wake_up(&c->rx_wq);
++	return IRQ_HANDLED;
++}
++
+ static unsigned int rx_poll_us = 1000;
+ module_param(rx_poll_us, uint, 0644);
+ MODULE_PARM_DESC(rx_poll_us, "BTIF rx polling period when idle (us); lower = less FIFO overrun risk, more CPU");
+@@ -1467,6 +1493,31 @@ static int consys_rx_thread(void *data)
+ 			continue;		/* while there is data - do not sleep */
+ 		}
+ 		stp_tx_retry(c, st);
++		if (c->rx_irq_on) {
++			/* nothing to read: sleep until the BTIF interrupt, but wake up in time for a retransmission */
++			/* with RX DMA a safety timeout stays even when idle, in case the DMA interrupt does not come */
++			unsigned long tmo = msecs_to_jiffies(st->nunack ? STP_RETRY_MS / 4 : c->rxdma_on ? 100 : 1000);
++			bool pending;
++
++			WRITE_ONCE(c->rx_ev, false);
++			if (c->rxdma_on) {
++				void __iomem *d = c->rxdma;
++
++				writel(ADMA_RX_INT_THRE_DONE, d + ADMA_INT_FLAG);	/* W1C, then unmask */
++				writel(ADMA_RX_INT_THRE_DONE, d + ADMA_INT_EN);
++				pending = (readl(d + ADMA_VFF_WPT) & 0x1ffff) != (c->rx_rpt & 0x1ffff);
++			} else {
++				writel(BTIF_IER_RXFEN, c->btif + BTIF_IER);
++				pending = readl(c->btif + BTIF_LSR) & BTIF_LSR_DR;
++			}
++			if (!pending)	/* otherwise the data came in before the interrupt was enabled */
++				wait_event_timeout(c->rx_wq, READ_ONCE(c->rx_ev) || kthread_should_stop(), tmo);
++			if (c->rxdma_on)
++				writel(0, c->rxdma + ADMA_INT_EN);
++			else
++				writel(0, c->btif + BTIF_IER);
++			continue;
++		}
+ 		{
+ 			unsigned int us = rx_poll_us ? rx_poll_us : 50;
+ 
+@@ -1502,10 +1553,25 @@ static int consys_rx_get_c(struct consys *c)
+ 				c->stp->rxn += drained;
+ 			}
+ 		}
++		c->rx_irq_line = c->rxdma_on ? c->irq_dma : c->irq;
++		if (rx_irq && c->rx_irq_line > 0) {
++			if (c->rxdma_on)
++				writel(0, c->rxdma + ADMA_INT_EN);
++			else
++				writel(0, c->btif + BTIF_IER);
++			if (request_irq(c->rx_irq_line, consys_btif_irq, 0, c->rxdma_on ? "consys-rxdma" : "consys-btif", c))
++				dev_warn(c->dev, "RX irq %d unavailable, polling\n", c->rx_irq_line);
++			else
++				c->rx_irq_on = true;
++		}
+ 		c->rx_task = kthread_run(consys_rx_thread, c, "consys-rx");
+ 		if (IS_ERR(c->rx_task)) {
+ 			ret = PTR_ERR(c->rx_task);
+ 			c->rx_task = NULL;
++			if (c->rx_irq_on) {
++				free_irq(c->rx_irq_line, c);
++				c->rx_irq_on = false;
++			}
+ 			stp_quiet = false;
+ 			if (c->rxdma_on)
+ 				btif_rxdma_stop(c);
+@@ -1524,6 +1590,11 @@ static void consys_rx_put_c(struct consys *c)
+ 	if (c->rx_users > 0 && --c->rx_users == 0 && c->rx_task) {
+ 		kthread_stop(c->rx_task);
+ 		c->rx_task = NULL;
++		if (c->rx_irq_on) {
++			free_irq(c->rx_irq_line, c);
++			c->rx_irq_on = false;
++		}
++		writel(0, c->btif + BTIF_IER);
+ 		if (c->rxdma_on)
+ 			btif_rxdma_stop(c);	/* back to PIO for the synchronous WMT/STP exchanges */
+ 		stp_quiet = false;
+@@ -2496,6 +2567,13 @@ static int consys_probe(struct platform_device *pdev)
+ 	mutex_init(&c->rx_lock);
+ 	mutex_init(&c->wmt_lock);
+ 	init_completion(&c->wmt_done);
++	init_waitqueue_head(&c->rx_wq);
++	c->irq = platform_get_irq_byname_optional(pdev, "btif");
++	if (c->irq < 0)
++		c->irq = 0;
++	c->irq_dma = platform_get_irq_byname_optional(pdev, "rxdma");
++	if (c->irq_dma < 0)
++		c->irq_dma = 0;
+ 	g_cs = c;
+ 	c->dev = dev;
+ 	platform_set_drvdata(pdev, c);

@@ -1,7 +1,7 @@
 From b287a75137a9f0bc9b26a5c2d6c0cf59ba04ebc6 Mon Sep 17 00:00:00 2001
 From: Begonia <begonia@localhost>
 Date: Fri, 13 Nov 2026 22:43:24 +0100
-Subject: [PATCH 16/18] staging: Add the MT6785 CONNSYS bring-up driver
+Subject: [PATCH 16/22] staging: Add the MT6785 CONNSYS bring-up driver
 
 Power up the MT6785 connectivity subsystem without the vendor WMT
 stack: genpd + CONN regulators, the MT6359 DCXO buffer, firmware

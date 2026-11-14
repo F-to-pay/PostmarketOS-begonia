@@ -1,7 +1,7 @@
 From 4eb050f06090ddb6416ef59b7a6fb4da714208be Mon Sep 17 00:00:00 2001
 From: Begonia <begonia@localhost>
 Date: Thu, 12 Nov 2026 14:26:26 +0100
-Subject: [PATCH 01/18] power: supply: Add MediaTek MT6359 PMIC fuel gauge
+Subject: [PATCH 01/22] power: supply: Add MediaTek MT6359 PMIC fuel gauge
  driver
 
 The MT6359 PMIC has a coulomb counter and a current ADC (FGADC) that

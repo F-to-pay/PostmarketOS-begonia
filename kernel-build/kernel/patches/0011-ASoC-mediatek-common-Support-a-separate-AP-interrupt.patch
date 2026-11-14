@@ -1,7 +1,7 @@
 From f3a5913eb8429523aa6f385e09f43ee28dd15c21 Mon Sep 17 00:00:00 2001
 From: Begonia <begonia@localhost>
 Date: Fri, 13 Nov 2026 22:43:23 +0100
-Subject: [PATCH 11/18] ASoC: mediatek: common: Support a separate AP interrupt
+Subject: [PATCH 11/22] ASoC: mediatek: common: Support a separate AP interrupt
  enable bit
 
 MT6785 routes each memif interrupt to the AP only when its bit in

@@ -1,7 +1,7 @@
 From f1a4bdb8a624a336fd315ec0bd31e64bd4599f0e Mon Sep 17 00:00:00 2001
 From: Begonia <begonia@localhost>
 Date: Fri, 13 Nov 2026 22:43:23 +0100
-Subject: [PATCH 13/18] ASoC: codecs: mt6359-accdet: Match the MFD cell name
+Subject: [PATCH 13/22] ASoC: codecs: mt6359-accdet: Match the MFD cell name
 
 The MT6359 MFD core registers the cell as "mt6359-accdet", so the
 driver named "pmic-codec-accdet" never binds. Rename it.

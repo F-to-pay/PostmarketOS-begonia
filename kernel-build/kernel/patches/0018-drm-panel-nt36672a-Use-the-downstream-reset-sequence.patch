@@ -1,7 +1,7 @@
 From 89844bb7b40fccae1233ccddc7bb9f83719d9d7d Mon Sep 17 00:00:00 2001
 From: Begonia <begonia@localhost>
 Date: Fri, 13 Nov 2026 23:53:06 +0100
-Subject: [PATCH 18/18] drm/panel: nt36672a: Use the downstream reset sequence
+Subject: [PATCH 18/22] drm/panel: nt36672a: Use the downstream reset sequence
  for the CSOT panel
 
 The CSOT panel of the Redmi Note 8 Pro stays dark after boot until the

@@ -1,0 +1,33 @@
+From f0e96cca64b3903fdeef6ef3c876636291d93e4b Mon Sep 17 00:00:00 2001
+From: Begonia <begonia@localhost>
+Date: Sat, 14 Nov 2026 13:23:38 +0100
+Subject: [PATCH 20/22] arm64: dts: mediatek: mt6785-xiaomi-begonia: Add the
+ BTIF interrupts to the CONNSYS node
+
+The BTIF link to the connectivity MCU raises SPI 138 (level low, as in the
+vendor devicetree) when its RX buffer contains data; with RX DMA enabled the
+data goes through the AP_DMA RX channel, which raises SPI 154. Describe both
+so that the driver can sleep until data arrives instead of polling the FIFO
+every millisecond.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Signed-off-by: Begonia <begonia@localhost>
+---
+ arch/arm64/boot/dts/mediatek/consys-begonia.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/mediatek/consys-begonia.dtsi b/arch/arm64/boot/dts/mediatek/consys-begonia.dtsi
+index 8be35f159..855893781 100755
+--- a/arch/arm64/boot/dts/mediatek/consys-begonia.dtsi
++++ b/arch/arm64/boot/dts/mediatek/consys-begonia.dtsi
+@@ -35,6 +35,10 @@ consys: consys@18002000 {
+ 		reg = <0 0x18002000 0 0x1000>,	/* CONN_MCU_CONFIG_BASE */
+ 		      <0 0x180b1000 0 0x1000>;	/* CONN_TOP_MISC_OFF_BASE */
+ 		reg-names = "mcu_cfg", "top_misc_off";
++		/* BTIF (AP side of the link to the MCU, regs 0x1100c000) and its AP_DMA RX channel (0x11000c00): vendor btif@1100c000, level low */
++		interrupts = <GIC_SPI 138 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 154 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-names = "btif", "rxdma";
+ 
+ 		power-domains = <&spm MT6785_POWER_DOMAIN_CONN>;
+ 		clocks = <&infracfg CLK_INFRA_CCIF4_AP>;

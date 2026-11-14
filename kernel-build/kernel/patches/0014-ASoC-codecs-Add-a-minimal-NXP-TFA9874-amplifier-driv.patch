@@ -1,7 +1,7 @@
 From e9f9dd6e3b349b8d62b1e159ce139579bdb38161 Mon Sep 17 00:00:00 2001
 From: Begonia <begonia@localhost>
 Date: Fri, 13 Nov 2026 22:43:23 +0100
-Subject: [PATCH 14/18] ASoC: codecs: Add a minimal NXP TFA9874 amplifier
+Subject: [PATCH 14/22] ASoC: codecs: Add a minimal NXP TFA9874 amplifier
  driver
 
 Bring the amplifier up the way the vendor tfa98xx driver does, without

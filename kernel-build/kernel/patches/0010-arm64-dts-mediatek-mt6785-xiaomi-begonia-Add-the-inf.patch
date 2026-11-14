@@ -1,7 +1,7 @@
 From 7c74d1f7c42ad6ee55c90bfaba7cb42c9c5ccd0a Mon Sep 17 00:00:00 2001
 From: Begonia <begonia@localhost>
 Date: Thu, 12 Nov 2026 22:15:47 +0100
-Subject: [PATCH 10/18] arm64: dts: mediatek: mt6785-xiaomi-begonia: Add the
+Subject: [PATCH 10/22] arm64: dts: mediatek: mt6785-xiaomi-begonia: Add the
  infrared transmitter
 
 The IR LED is on GPIO26 (PWM_0 function), driven by channel 0 of the

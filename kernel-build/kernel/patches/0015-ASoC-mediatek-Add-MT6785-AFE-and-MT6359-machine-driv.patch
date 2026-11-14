@@ -1,7 +1,7 @@
 From 9621dc2d8b3fbc2681663e0c85a9c029f1ddf4fe Mon Sep 17 00:00:00 2001
 From: Begonia <begonia@localhost>
 Date: Fri, 13 Nov 2026 22:43:23 +0100
-Subject: [PATCH 15/18] ASoC: mediatek: Add MT6785 AFE and MT6359 machine
+Subject: [PATCH 15/22] ASoC: mediatek: Add MT6785 AFE and MT6359 machine
  driver
 
 Port the MT6785 audio front end from the vendor 4.14 kernel to the
