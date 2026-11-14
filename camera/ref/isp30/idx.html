@@ -1,0 +1,257 @@
+<!-- MHonArc v2.6.19 -->
+<!--X-Subject: [PATCH v8 0/5] Add Mediatek ISP3.0 -->
+<!--X-From-R13: Xhyvra Egrcuna &#60;wfgrcunaNonlyvoer.pbz> -->
+<!--X-Date: Wed, 22 Jan 2025 08:59:50 &#45;0500 (EST) -->
+<!--X-Message-Id: 20250122&#45;add&#45;mtk&#45;isp&#45;3&#45;0&#45;support&#45;v8&#45;0&#45;a3d3731eef45@baylibre.com -->
+<!--X-Content-Type: text/plain -->
+<!--X-Head-End-->
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+                      "http://www.w3.org/TR/REC-html40/loose.dtd">
+<html lang=en>
+<head>
+<meta HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-2">
+<title>Linux-Kernel Archive: [PATCH v8 0/5] Add Mediatek ISP3.0</title>
+<meta NAME="Author" CONTENT="Julien Stephan &lt;jstephan@xxxxxxxxxxxx&gt;">
+<meta NAME="Subject" CONTENT="[PATCH v8 0/5] Add Mediatek ISP3.0">
+</head> 
+<body BGCOLOR="#FFFFFF" TEXT="#000000">
+
+<!--X-Body-Begin-->
+<!--X-User-Header-->
+<!--X-User-Header-End-->
+<!--X-TopPNI-->
+
+
+<!--X-TopPNI-End-->
+<!--X-MsgBody-->
+<!--X-Subject-Header-Begin-->
+<h1>[PATCH v8 0/5] Add Mediatek ISP3.0</h1>
+<strong>From: </strong>Julien Stephan
+<br><strong>Date: </strong> Wed Jan 22 2025 - 08:59:50 EST
+<p>
+<ul>
+<li><strong>Next message: </strong> <a href="06544.html"> Julien Stephan: "[PATCH v8 2/5] dt-bindings: media: add mediatek ISP3.0 camsv"</a>
+
+<li><strong>Previous message: </strong> <a href="06542.html"> Julien Stephan: "[PATCH v8 1/5] dt-bindings: media: add mediatek ISP3.0 sensor interface"</a>
+
+
+
+<li><strong>Next in thread: </strong> <a href="06542.html"> Julien Stephan: "[PATCH v8 1/5] dt-bindings: media: add mediatek ISP3.0 sensor interface"</a>
+
+<li><strong>Messages sorted by: </strong><a href="date.html#06543">[ date ]</a> <a href="index.html#06543">[ thread ]</a> <a href="subject.html#06543">[ subject ]</a> <a href="author.html#06543">[ author ]</a>
+</ul>
+
+<!--X-Subject-Header-End-->
+<!--X-Head-of-Message-->
+<!--X-Head-of-Message-End-->
+<!--X-Head-Body-Sep-Begin-->
+<hr NOSHADE>
+<!--X-Head-Body-Sep-End-->
+<!--X-Body-of-Message-->
+This series adds the support of the Mediatek ISP3.0 found on some<br>
+Mediatek SoCs such as the mt8365. The driver is divided into 2 parts:<br>
+<br>
+* SENINF: the sensor interface<br>
+* CAMSV: this driver provides a path to bypass the SoC ISP so that image<br>
+  data coming from the SENINF can go directly into memory without any<br>
+  image processing. This allows the use of an external ISP or camera<br>
+  sensor directly.<br>
+<br>
+The SENINF driver is based on previous work done by Louis Kuo available<br>
+as an RFC here: <a  rel="nofollow" href="https://lore.kernel.org/all/20200708104023.3225-1-louis.kuo@xxxxxxxxxxxx/">https://lore.kernel.org/all/20200708104023.3225-1-louis.kuo@xxxxxxxxxxxx/</a><br>
+<br>
+Changes in v8:<br>
+For the whole series:<br>
+- rebase  on v6.13-rc1 --&gt; drop iommu_present and use device_iommu_mapped instead<br>
+- apply new trailers<br>
+- fix several coding style issues reported by Laurent and CK<br>
+- fix warnings and errors reported by media-ci:<br>
+  <a  rel="nofollow" href="https://linux-media.pages.freedesktop.org/-/users/patchwork/-/jobs/66966282/artifacts/report.htm">https://linux-media.pages.freedesktop.org/-/users/patchwork/-/jobs/66966282/artifacts/report.htm</a><br>
+<br>
+Camsv bindings:<br>
+- sort header alphabetically<br>
+<br>
+Seninf driver:<br>
+- remove test pattern generator, as it was legacy untested code<br>
+- use v4l2_subdev_enable_streams/v4l2_subdev_disable_streams instead of<br>
+  v4l2_subdev_call(s_stream)<br>
+- simplify mtk_seninf_v4l2_register: correctly split the media device<br>
+  and seninf subdev initialization. Create an seninf_subdev_init<br>
+function and drop mtk_seninf_media_init which was confusing<br>
+- Fix several style issues<br>
+<br>
+Camsv driver:<br>
+- remove the &quot;30&quot; suffix: renaming camsv30 to camsv (file name and<br>
+  function name)<br>
+- add comment to properly describe the fbc mechanism<br>
+- reduce spin_lock region in isp_irq_camsv function<br>
+- remove pm operation from mtk_camsv_fbc_inc<br>
+- call mtk_camsv_fbc_inc at the beginning of streaming or only when<br>
+  streaming: buf_queue touch the hw only if streaming<br>
+- remove op_lock and rely on the video device lock<br>
+- implement .link_validate() and drop mtk_cam_verify_format<br>
+- use video_device_pipeline_start instead of media_pipeline_start<br>
+- remove useless stream_count counter<br>
+- add various defines for constants<br>
+- merge content of mtk_camsv.c into mtk_camsv_video.c as suggested by CK<br>
+- merge mtk_cam_mbus_formats and mtk_cam_format_info intpo a single<br>
+  struct, and extend it with fields to remove the fmt_to_sparams() function.<br>
+<br>
+- Link to v7: <a  rel="nofollow" href="https://lore.kernel.org/r/20241121-add-mtk-isp-3-0-support-v7-0-b04dc9610619@xxxxxxxxxxxx">https://lore.kernel.org/r/20241121-add-mtk-isp-3-0-support-v7-0-b04dc9610619@xxxxxxxxxxxx</a><br>
+<br>
+Changes in v7:<br>
+- fix several comments from Laurent Pinchart and CK about style issues,<br>
+  such as: sort Kconfig and Makefile alphabetically, remove unneeded headers,<br>
+  use 80 char limits ...<br>
+- add back I/O accessors around readl/writel<br>
+- use enable_streams/disable_streams instead of s_stream<br>
+- use v4l2_subdev_init_finalize and don't store active format<br>
+- remove mtk_camsv30_regs.h file to merge it inside mtk_camsv30_hw.c<br>
+- adding reviewed-by tag from robh and angelo<br>
+- implement .has_pad_interdep callback to fix multistream error<br>
+- fix mtk_seninf_get_clk_divider to give the correct pad number. This<br>
+  caused an issue for multi camera<br>
+- use hardware FBC (framce buffer control) instead of dummy buffer to<br>
+  deal with underrruns<br>
+- simplify directory architecture and remove isp_30, camsv and seninf<br>
+  directories<br>
+<br>
+- Link to v6: <a  rel="nofollow" href="https://lore.kernel.org/r/20240729-add-mtk-isp-3-0-support-v6-0-c374c9e0c672@xxxxxxxxxxxx">https://lore.kernel.org/r/20240729-add-mtk-isp-3-0-support-v6-0-c374c9e0c672@xxxxxxxxxxxx</a><br>
+<br>
+Changes in v6:<br>
+- remove unneeded &quot;link&quot; tag from commits<br>
+<br>
+bindings:<br>
+- remove labels from example node<br>
+- remove complexity for phy and phy-name properties<br>
+<br>
+driver:<br>
+- fix some comments from CK :<br>
+  - remove unneeded variables<br>
+  - rename irqlock to buf_list_lock for clarity<br>
+  - remove unneeded lock/unlock around hw_enable/hw_disable<br>
+<br>
+- Link to v5: <a  rel="nofollow" href="https://lore.kernel.org/r/20240704-add-mtk-isp-3-0-support-v5-0-bfccccc5ec21@xxxxxxxxxxxx">https://lore.kernel.org/r/20240704-add-mtk-isp-3-0-support-v5-0-bfccccc5ec21@xxxxxxxxxxxx</a><br>
+<br>
+Changes on v5:<br>
+drivers:<br>
+- rebase on 6.10-rc1<br>
+- fix various comments from all reviews (mostly style issues and minor<br>
+  code refactor)<br>
+- add a function to calculate the clock divider for the master sensor<br>
+  clock: NOTE: setting this register seems to have no effect at all,<br>
+  currently checking with mediatek apps engineer (OOO until 17/04)<br>
+<br>
+bindings:<br>
+- camsv: update description<br>
+- seninf: fix phy definition and example indentation<br>
+- use generic name for node example<br>
+<br>
+dts:<br>
+- sort nodes by addresses<br>
+- use lower case for hexadecimal<br>
+<br>
+Changes in v4:<br>
+- fix suspend/resume deadlock<br>
+- fix various locking issues reported by Laurent Pinchart on v3<br>
+- run LOCKDEP<br>
+- add missing include reported by kernel-test-robot for non mediatek arch and COMPILE_TEST=y<br>
+- use atomic poll inside mtk_camsv30_setup<br>
+- drop second lane support as it was not used<br>
+- remove useless members in structs<br>
+- fix media entity initialization<br>
+- initialize correct pad for camsv video device<br>
+- add isp support in mt8365.dtsi<br>
+- rebase on 6.7<br>
+<br>
+Changes in v3:<br>
+- fix a lot of formatting issues/coding style issues found in camsv/seninf reported by Angelo on v2<br>
+- fix camsv/seninf binding file error reported by Rob<br>
+<br>
+Changes in v2:<br>
+- renamed clock `cam_seninf` to `camsys`<br>
+- renamed clock `top_mux_seninf` to `top_mux`<br>
+- moved phy properties from port nodes to top level<br>
+- remove patternProperties<br>
+- specify power management dependency in the cover letter description to fix<br>
+  missing include in dt-binding example<br>
+- change '$ref' properties on some endpoint nodes from<br>
+  '$ref: video-interfaces.yaml#' to '$ref: /schemas/graph.yaml#/$defs/endpoint-base'<br>
+ where applicable<br>
+<br>
+Best<br>
+Julien Stephan<br>
+<br>
+Signed-off-by: Julien Stephan &lt;jstephan@xxxxxxxxxxxx&gt;<br>
+---<br>
+Julien Stephan (1):<br>
+      arm64: dts: mediatek: mt8365: Add support for camera<br>
+<br>
+Louis Kuo (2):<br>
+      dt-bindings: media: add mediatek ISP3.0 sensor interface<br>
+      media: platform: mediatek: isp: add mediatek ISP3.0 sensor interface<br>
+<br>
+Phi-bang Nguyen (2):<br>
+      dt-bindings: media: add mediatek ISP3.0 camsv<br>
+      media: platform: mediatek: isp: add mediatek ISP3.0 camsv<br>
+<br>
+ .../bindings/media/mediatek,mt8365-camsv.yaml      |  109 ++<br>
+ .../bindings/media/mediatek,mt8365-seninf.yaml     |  259 ++++<br>
+ MAINTAINERS                                        |    9 +<br>
+ arch/arm64/boot/dts/mediatek/mt8365.dtsi           |  125 ++<br>
+ drivers/media/platform/mediatek/Kconfig            |    1 +<br>
+ drivers/media/platform/mediatek/Makefile           |    1 +<br>
+ drivers/media/platform/mediatek/isp/Kconfig        |   36 +<br>
+ drivers/media/platform/mediatek/isp/Makefile       |    8 +<br>
+ drivers/media/platform/mediatek/isp/mtk_camsv.h    |  152 ++<br>
+ drivers/media/platform/mediatek/isp/mtk_camsv_hw.c |  440 ++++++<br>
+ drivers/media/platform/mediatek/isp/mtk_camsv_hw.h |   19 +<br>
+ .../media/platform/mediatek/isp/mtk_camsv_reg.h    |   90 ++<br>
+ .../media/platform/mediatek/isp/mtk_camsv_video.c  | 1017 ++++++++++++++<br>
+ drivers/media/platform/mediatek/isp/mtk_seninf.c   | 1454 ++++++++++++++++++++<br>
+ .../media/platform/mediatek/isp/mtk_seninf_reg.h   |  114 ++<br>
+ 15 files changed, 3834 insertions(+)<br>
+---<br>
+base-commit: 414788dae5ac03f80234629c6d140a38fb1fbf9d<br>
+change-id: 20240704-add-mtk-isp-3-0-support-a08a978cac36<br>
+<br>
+Best regards,<br>
+-- <br>
+Julien Stephan &lt;jstephan@xxxxxxxxxxxx&gt;<br>
+<br>
+<br>
+<br>
+
+<!--X-Body-of-Message-End-->
+<!--X-MsgBody-End-->
+<!--X-Follow-Ups-->
+<hr NOSHADE>
+
+
+
+
+
+
+
+</ul></li></ul>
+<!--X-Follow-Ups-End-->
+<!--X-References-->
+<!--X-References-End-->
+<!--X-BotPNI-->
+<ul>
+<li><strong>Next message: </strong> <a href="06544.html"> Julien Stephan: "[PATCH v8 2/5] dt-bindings: media: add mediatek ISP3.0 camsv"</a>
+
+<li><strong>Previous message: </strong> <a href="06542.html"> Julien Stephan: "[PATCH v8 1/5] dt-bindings: media: add mediatek ISP3.0 sensor interface"</a>
+
+
+
+<li><strong>Next in thread: </strong> <a href="06542.html"> Julien Stephan: "[PATCH v8 1/5] dt-bindings: media: add mediatek ISP3.0 sensor interface"</a>
+
+<li><strong>Messages sorted by: </strong><a href="date.html#06543">[ date ]</a> <a href="index.html#06543">[ thread ]</a> <a href="subject.html#06543">[ subject ]</a> <a href="author.html#06543">[ author ]</a>
+</ul>
+
+<!--X-BotPNI-End-->
+<!--X-User-Footer-->
+<!--X-User-Footer-End-->
+</body>
+</html>

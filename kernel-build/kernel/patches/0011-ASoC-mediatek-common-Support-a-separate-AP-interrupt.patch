@@ -1,0 +1,86 @@
+From f3a5913eb8429523aa6f385e09f43ee28dd15c21 Mon Sep 17 00:00:00 2001
+From: Begonia <begonia@localhost>
+Date: Fri, 13 Nov 2026 22:43:23 +0100
+Subject: [PATCH 11/18] ASoC: mediatek: common: Support a separate AP interrupt
+ enable bit
+
+MT6785 routes each memif interrupt to the AP only when its bit in
+AFE_IRQ_MCU_EN is set in addition to the generic enable bit. Add
+irq_ap_en_reg/irq_ap_en_shift to struct mtk_base_irq_data and toggle it
+from the common trigger callback. Also ratelimit the hw_ptr error that
+floods the log while a stream is being torn down.
+
+Signed-off-by: Begonia <begonia@localhost>
+---
+ sound/soc/mediatek/common/mtk-afe-fe-dai.c          | 12 ++++++++++++
+ sound/soc/mediatek/common/mtk-afe-platform-driver.c |  2 +-
+ sound/soc/mediatek/common/mtk-base-afe.h            |  2 ++
+ 3 files changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/sound/soc/mediatek/common/mtk-afe-fe-dai.c b/sound/soc/mediatek/common/mtk-afe-fe-dai.c
+index 3809068f5..36234beae 100644
+--- a/sound/soc/mediatek/common/mtk-afe-fe-dai.c
++++ b/sound/soc/mediatek/common/mtk-afe-fe-dai.c
+@@ -6,10 +6,12 @@
+  * Author: Garlic Tseng <garlic.tseng@mediatek.com>
+  */
+ 
++#include <linux/delay.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/regmap.h>
++#include <linux/workqueue.h>
+ #include <sound/soc.h>
+ #include "mtk-afe-platform-driver.h"
+ #include <sound/pcm_params.h>
+@@ -238,6 +240,12 @@ int mtk_afe_fe_trigger(struct snd_pcm_substream *substream, int cmd,
+ 		mtk_regmap_update_bits(afe->regmap, irq_data->irq_en_reg,
+ 				       1, 1, irq_data->irq_en_shift);
+ 
++		/* IRQ -> AP (the vendor irq_ap_en_reg = AFE_IRQ_MCU_EN) */
++		if (irq_data->irq_ap_en_reg)
++			mtk_regmap_update_bits(afe->regmap,
++					       irq_data->irq_ap_en_reg,
++					       1, 1, irq_data->irq_ap_en_shift);
++
+ 		return 0;
+ 	case SNDRV_PCM_TRIGGER_STOP:
+ 	case SNDRV_PCM_TRIGGER_SUSPEND:
+@@ -250,6 +258,10 @@ int mtk_afe_fe_trigger(struct snd_pcm_substream *substream, int cmd,
+ 		/* disable interrupt */
+ 		mtk_regmap_update_bits(afe->regmap, irq_data->irq_en_reg,
+ 				       1, 0, irq_data->irq_en_shift);
++		if (irq_data->irq_ap_en_reg)
++			mtk_regmap_update_bits(afe->regmap,
++					       irq_data->irq_ap_en_reg,
++					       1, 0, irq_data->irq_ap_en_shift);
+ 		/* and clear pending IRQ */
+ 		mtk_regmap_write(afe->regmap, irq_data->irq_clr_reg,
+ 				 1 << irq_data->irq_clr_shift);
+diff --git a/sound/soc/mediatek/common/mtk-afe-platform-driver.c b/sound/soc/mediatek/common/mtk-afe-platform-driver.c
+index 70fd05d5f..981df43d5 100644
+--- a/sound/soc/mediatek/common/mtk-afe-platform-driver.c
++++ b/sound/soc/mediatek/common/mtk-afe-platform-driver.c
+@@ -93,7 +93,7 @@ snd_pcm_uframes_t mtk_afe_pcm_pointer(struct snd_soc_component *component,
+ 
+ 	ret = regmap_read(regmap, reg_ofs_cur, &hw_ptr);
+ 	if (ret || hw_ptr == 0) {
+-		dev_err(dev, "%s hw_ptr err\n", __func__);
++		dev_err_ratelimited(dev, "%s hw_ptr err\n", __func__);
+ 		pcm_ptr_bytes = 0;
+ 		goto POINTER_RETURN_FRAMES;
+ 	}
+diff --git a/sound/soc/mediatek/common/mtk-base-afe.h b/sound/soc/mediatek/common/mtk-base-afe.h
+index a406f2e3e..ca81569c6 100644
+--- a/sound/soc/mediatek/common/mtk-base-afe.h
++++ b/sound/soc/mediatek/common/mtk-base-afe.h
+@@ -86,6 +86,8 @@ struct mtk_base_irq_data {
+ 	int irq_en_shift;
+ 	int irq_clr_reg;
+ 	int irq_clr_shift;
++	int irq_ap_en_reg;
++	int irq_ap_en_shift;
+ 	int irq_status_shift;
+ };
+ 

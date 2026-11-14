@@ -1,0 +1,47 @@
+=== ts_novatek
+compatible/ = novatek,NVT-ts-spi 
+name/ = ts_novatek 
+novatek,config-array-size/ =  00 00 00 02
+novatek,irq-gpio/ =  00 00 00 1d 00 00 00 01 00 00 20 01
+novatek,reset-gpio/ =  00 00 00 1d 00 00 00 02 00 00 00 00
+novatek,reset-tddi/ =  00 00 00 1d 00 00 00 2c 00 00 00 00
+novatek,spi-rd-fast-addr/ =  00 03 f3 10
+novatek,swrst-n8-addr/ =  00 03 f0 fe
+phandle/ =  00 00 01 45
+pinctrl-0/ =  00 00 01 80 00 00 01 81
+pinctrl-1/ =  00 00 01 82 00 00 01 83
+pinctrl-names/ = pmx_ts_active pmx_ts_suspend 
+spi-max-frequency/ =  LK@
+status/ = ok 
+=== 
+/novatek,cfg_0/name = novatek,cfg_0 
+/novatek,cfg_0/novatek,clicknum-file-name = nvt+csot 
+/novatek,cfg_0/novatek,display-maker =    B
+/novatek,cfg_0/novatek,fw-name = novatek_nt36672a_g7_fw01.bin 
+/novatek,cfg_0/novatek,mp-name = novatek_nt36672a_g7_mp01.bin 
+/novatek,cfg_0/novatek,tp-vendor =    S
+=== 
+/novatek,cfg_1/name = novatek,cfg_1 
+/novatek,cfg_1/novatek,clicknum-file-name = nvt+tianma 
+/novatek,cfg_1/novatek,display-maker =    6
+/novatek,cfg_1/novatek,fw-name = novatek_nt36672a_g7_fw02.bin 
+/novatek,cfg_1/novatek,mp-name = novatek_nt36672a_g7_mp02.bin 
+/novatek,cfg_1/novatek,tp-vendor =    F
+=== 
+/novatek-mp-criteria-nvtpid@0/#address-cells =  00 00 00 01
+/novatek-mp-criteria-nvtpid@0/#size-cells =  00 00 00 00
+/novatek-mp-criteria-nvtpid@0/AIN_KEY =  00 00 00 00 00 00 00 01 00 00 00 02 00 00 00 ff
+/novatek-mp-criteria-nvtpid@0/AIN_X =  00 00 00 00 00 00 00 01 00 00 00 02 00 00 00 03 00 00 00 04 00 00 00 05 00 00 00 06 00 00 00 07 00 00 00 08 00 00 00 09 00 00 00 0a 00 00 00 0b 00 00 00 0c 00 00 00 0d 00 00 00 0e 00 00 00 0f 00 00 00 10 00 00 00 11
+/novatek-mp-criteria-nvtpid@0/AIN_Y =  00 00 00 00 00 00 00 01 00 00 00 02 00 00 00 03 00 00 00 04 00 00 00 05 00 00 00 06 00 00 00 07 00 00 00 08 00 00 00 09 00 00 00 0a 00 00 00 0b 00 00 00 0c 00 00 00 0d 00 00 00 0e 00 00 00 0f 00 00 00 10 00 00 00 11 00 00 00 12 00 00 00 13 00 00 00 14 00 00 00 15 00 00 00 16 00 00 00 17 00 00 00 18 00 00 00 19 00 00 00 1a 00 00 00 1b 00 00 00 1c 00 00 00 1d 00 00 00 1e 00 00 00 1f 00 00 00 20 00 00 00 21 00 00 00 22 00 00 00 23
+/novatek-mp-criteria-nvtpid@0/IC_KEY_CFG_SIZE =  00 00 00 04
+/novatek-mp-criteria-nvtpid@0/IC_X_CFG_SIZE =  00 00 00 12
+/novatek-mp-criteria-nvtpid@0/IC_Y_CFG_SIZE =    $
+/novatek-mp-criteria-nvtpid@0/PS_Config_Diff_Test_Frame =    2
+/novatek-mp-criteria-nvtpid@0/X_Channel =  00 00 00 12
+/novatek-mp-criteria-nvtpid@0/Y_Channel =    $
+/novatek-mp-criteria-nvtpid@0/compatible = novatek-mp-criteria-nvtpid 
+/novatek-mp-criteria-nvtpid@0/name = novatek-mp-criteria-nvtpid 
+=== firmware search
+/tmp/venm/firmware/NT36xxx_MP_Setting_Criteria_5921.csv
+/tmp/venm/firmware/NT36xxx_MP_Setting_Criteria_5920.csv
+ls: /lib/firmware: No such file or directory

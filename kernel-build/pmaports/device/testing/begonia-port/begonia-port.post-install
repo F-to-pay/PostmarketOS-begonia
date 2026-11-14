@@ -1,0 +1,7 @@
+#!/bin/sh
+# PulseAudio gets a crooked MT6359 volume scale from the TLV: the slider is even only with ignore_dB=1
+P=/etc/pulse/default.pa
+if [ -f "$P" ] && grep -q '^load-module module-udev-detect$' "$P"; then
+	sed -i 's/^load-module module-udev-detect$/load-module module-udev-detect ignore_dB=1/' "$P"
+fi
+exit 0

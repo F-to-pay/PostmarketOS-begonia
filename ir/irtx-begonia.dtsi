@@ -1,0 +1,35 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * IR transmitter of the Redmi Note 8 Pro (begonia): the LED on GPIO26 (function PWM_0), PWM controller pwm0, channel 0.
+ * The vendor (mtk_irtx_pwm.c) drove it through PWM memory mode; mainline has a ready driver pwm-ir-tx
+ * (CONFIG_IR_PWM_TX): it chops the carrier with PWM by the timings. It creates /dev/lirc0 (ir-ctl --send).
+ * The default carrier is 38 kHz (26316 ns); the driver can change it and the duty cycle from userspace.
+ *
+ * Included at the end of arch/arm64/boot/dts/mediatek/mt6785-xiaomi-begonia.dts:
+ *     #include "irtx-begonia.dtsi"
+ */
+
+#include <dt-bindings/pinctrl/mediatek,mt6785-pinfunc.h>
+
+&pio {
+	irtx_pins: irtx-pins {
+		pins-irtx {
+			pinmux = <PINMUX_GPIO26__FUNC_PWM_0>;
+			slew-rate = <1>;
+			output-low;
+		};
+	};
+};
+
+&pwm0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&irtx_pins>;
+	status = "okay";
+};
+
+/ {
+	ir_tx: ir-transmitter {
+		compatible = "pwm-ir-tx";
+		pwms = <&pwm0 0 26316>;
+	};
+};

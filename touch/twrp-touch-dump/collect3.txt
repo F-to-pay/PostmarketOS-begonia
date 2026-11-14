@@ -1,0 +1,30 @@
+=== nodes mentioning novatek/nvt
+/sys/firmware/devicetree/base/ts_novatek/novatek,cfg_0/novatek,fw-name
+/sys/firmware/devicetree/base/ts_novatek/novatek,cfg_0/novatek,mp-name
+/sys/firmware/devicetree/base/ts_novatek/novatek,cfg_0/novatek,clicknum-file-name
+/sys/firmware/devicetree/base/ts_novatek/novatek,cfg_0/name
+/sys/firmware/devicetree/base/ts_novatek/novatek,cfg_1/novatek,fw-name
+/sys/firmware/devicetree/base/ts_novatek/novatek,cfg_1/novatek,mp-name
+/sys/firmware/devicetree/base/ts_novatek/novatek,cfg_1/novatek,clicknum-file-name
+/sys/firmware/devicetree/base/ts_novatek/novatek,cfg_1/name
+/sys/firmware/devicetree/base/ts_novatek/compatible
+/sys/firmware/devicetree/base/ts_novatek/name
+/sys/firmware/devicetree/base/ts_novatek/novatek-mp-criteria-nvtpid@0/compatible
+/sys/firmware/devicetree/base/ts_novatek/novatek-mp-criteria-nvtpid@0/name
+/sys/firmware/devicetree/base/__symbols__/ts_novatek
+=== gpio chips
+gpiochip0: GPIOs 301-511, parent: platform/pinctrl, pinctrl_paris:
+=== gpio lines with a consumer
+ gpio-302 (                    |NVT-int             ) in  hi IRQ
+ gpio-303 (                    |NVT-tp-rst          ) out hi    
+ gpio-306 (                    |pcb_gpio            ) in  hi    
+ gpio-308 (                    |type_c_port0-IRQ    ) in  hi IRQ
+ gpio-309 (                    |cd                  ) in  hi IRQ
+ gpio-317 (                    |5-0034.irq          ) in  hi IRQ
+ gpio-322 (                    |smb_suspend_gpio    ) out hi    
+ gpio-325 (                    |TFA98XX_RST         ) out lo    
+ gpio-370 (                    |TFA98XX_INT         ) in  lo    
+ gpio-388 (                    |nfc_firm_gpio       ) out lo    
+ gpio-389 (                    |nfc_irq_gpio        ) in  lo IRQ
+ gpio-428 (                    |connect_therm_gpio  ) out lo    
+ gpio-469 (                    |nfc_reset_gpio      ) out hi    

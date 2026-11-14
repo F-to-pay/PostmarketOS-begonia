@@ -1,0 +1,107 @@
+# Userspace glue for the Redmi Note 8 Pro (begonia) port: services, modprobe/udev config,
+# PulseAudio profile set, audio/IR helpers. Kernel drivers live in linux-postmarketos-mediatek-mt6785.
+# Proprietary CONNSYS/touch firmware (subpackage -firmware) is NOT part of port/: apply-overlay.sh copies it
+# into the pmaports package directory from FWDIR (your own backup of the phone).
+pkgname=begonia-port
+pkgver=1
+pkgrel=3
+pkgdesc="Redmi Note 8 Pro (begonia): WiFi/BT/audio/IR integration"
+url="https://postmarketos.org"
+arch="aarch64"
+license="GPL-2.0-only"
+# pulseaudio - explicitly: post-install edits /etc/pulse/default.pa, the file must exist by then
+depends="
+	alsa-utils
+	kmod
+	ladspa
+	lsp-plugins-ladspa
+	pulseaudio
+	pulseaudio-utils
+	v4l-utils
+	$pkgname-firmware
+"
+makedepends="gcc musl-dev"
+options="!check"
+install="$pkgname.post-install"
+subpackages="$pkgname-firmware:firmware:noarch"
+_scripts="hp-on hp-off spk-on spk-off spk-hpf mic-scan rcv-play ir-test mic-nc"
+_fw="
+	WIFI_RAM_CODE_soc1_0_2a_1.bin
+	soc1_0_patch_mcu_2a_1_hdr.bin
+	soc1_0_ram_bt_2a_1_hdr.bin
+	soc1_0_ram_mcu_2a_1_hdr.bin
+	soc1_0_ram_wifi_2a_1_hdr.bin
+"
+source="
+	begonia-wifi.sh
+	begonia-wifi.service
+	begonia-audio.sh
+	begonia-audio.service
+	begonia-modprobe.conf
+	begonia-ir.conf
+	90-begonia-audio.rules
+	90-stk3310.rules
+	mt6785-mt6359.conf
+	mt6785-mic.conf
+	analog-output-headphones.conf
+	analog-output-speaker.conf
+	idle-shutdown.sh
+	idle-shutdown.service
+	mic-nc-dsp.c
+	wifi.cfg
+	txpowerctrl.cfg
+	hp-on.sh hp-off.sh spk-on.sh spk-off.sh spk-hpf.sh mic-scan.sh rcv-play.sh ir-test.sh mic-nc.sh
+	$_fw
+"
+builddir="$srcdir"
+
+build() {
+	${CC:-gcc} $CFLAGS -O2 -o mic-nc-dsp mic-nc-dsp.c -lm
+}
+
+package() {
+	local s u="$pkgdir"/usr/lib/systemd/system
+	for s in $_scripts; do
+		install -Dm755 "$srcdir"/$s.sh "$pkgdir"/usr/bin/$s
+	done
+	install -Dm755 mic-nc-dsp "$pkgdir"/usr/bin/mic-nc-dsp
+	install -Dm755 begonia-wifi.sh "$pkgdir"/usr/libexec/begonia/begonia-wifi
+	install -Dm755 begonia-audio.sh "$pkgdir"/usr/libexec/begonia/begonia-audio
+	install -Dm755 idle-shutdown.sh "$pkgdir"/usr/bin/idle-shutdown.sh
+
+	for s in begonia-wifi begonia-audio idle-shutdown; do
+		install -Dm644 $s.service "$u"/$s.service
+		mkdir -p "$u"/multi-user.target.wants
+		ln -s ../$s.service "$u"/multi-user.target.wants/$s.service
+	done
+	# alsa-restore/alsa-state would restore the volume/route of the previous session (incl. the speaker) - mask them
+	mkdir -p "$pkgdir"/etc/systemd/system
+	ln -s /dev/null "$pkgdir"/etc/systemd/system/alsa-restore.service
+	ln -s /dev/null "$pkgdir"/etc/systemd/system/alsa-state.service
+	# The XDG autostart start-pulseaudio-x11 loads module-x11-publish into the daemon, and at the start of a Plasma Mobile session that one
+	# waits forever for the lazy Xwayland (connect @/tmp/.X11-unix/X0) -> PulseAudio hangs, no sound until kill -9.
+	# It is not needed on Wayland; the daemon itself is brought up by autospawn from the first client.
+	mkdir -p "$pkgdir"/etc/systemd/user
+	ln -s /dev/null "$pkgdir"/etc/systemd/user/app-pulseaudio@autostart.service
+
+	install -Dm644 begonia-modprobe.conf "$pkgdir"/usr/lib/modprobe.d/begonia.conf
+	install -Dm644 begonia-ir.conf "$pkgdir"/usr/lib/modules-load.d/begonia-ir.conf
+	install -Dm644 90-begonia-audio.rules "$pkgdir"/usr/lib/udev/rules.d/90-begonia-audio.rules
+	install -Dm644 90-stk3310.rules "$pkgdir"/usr/lib/udev/rules.d/90-stk3310.rules
+
+	for s in mt6785-mt6359.conf mt6785-mic.conf analog-output-headphones.conf analog-output-speaker.conf; do
+		install -Dm644 $s "$pkgdir"/usr/share/begonia/pulse/$s
+	done
+	install -Dm644 wifi.cfg "$pkgdir"/usr/lib/firmware/wifi.cfg
+	install -Dm644 txpowerctrl.cfg "$pkgdir"/usr/lib/firmware/txpowerctrl.cfg
+}
+
+firmware() {
+	pkgdesc="Redmi Note 8 Pro (begonia): proprietary CONNSYS firmware (local build only)"
+	depends=""
+	local d="$subpkgdir"/usr/lib/firmware
+	install -Dm644 "$srcdir"/WIFI_RAM_CODE_soc1_0_2a_1.bin "$d"/WIFI_RAM_CODE_soc1_0_2a_1.bin
+	for f in soc1_0_patch_mcu_2a_1_hdr.bin soc1_0_ram_bt_2a_1_hdr.bin soc1_0_ram_mcu_2a_1_hdr.bin soc1_0_ram_wifi_2a_1_hdr.bin; do
+		install -Dm644 "$srcdir"/$f "$d"/begonia-connsys/$f
+	done
+}

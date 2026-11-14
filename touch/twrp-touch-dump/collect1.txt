@@ -1,0 +1,169 @@
+=== uname
+Linux localhost 4.14.247-Neutrino-Stock #1 SMP PREEMPT Thu Sep 23 22:39:09 WIB 2021 aarch64
+=== /proc/bus/input/devices
+I: Bus=0019 Vendor=0000 Product=0000 Version=0000
+N: Name="ACCDET"
+P: Phys=
+S: Sysfs=/devices/virtual/input/input0
+U: Uniq=
+H: Handlers=disp_tphint event0 
+B: PROP=0
+B: EV=23
+B: KEY=40 0 0 0 0 6 400000000 0 0 0
+B: SW=d4
+
+I: Bus=0019 Vendor=2454 Product=6500 Version=0010
+N: Name="mtk-kpd"
+P: Phys=
+S: Sysfs=/devices/platform/10010000.kp/input/input1
+U: Uniq=
+H: Handlers=disp_tphint event1 
+B: PROP=0
+B: EV=3
+B: KEY=1c000000000000 0
+
+I: Bus=001c Vendor=0000 Product=0000 Version=0000
+N: Name="NVTCapacitiveTouchScreen"
+P: Phys=input/ts
+S: Sysfs=/devices/virtual/input/input2
+U: Uniq=
+H: Handlers=disp_tphint event2 
+B: PROP=2
+B: EV=b
+B: KEY=400 0 0 8000 10000000000000 0
+B: ABS=261800000000000
+
+I: Bus=0000 Vendor=0000 Product=0000 Version=0000
+N: Name="uinput-goodix"
+P: Phys=
+S: Sysfs=/devices/virtual/input/input4
+U: Uniq=
+H: Handlers=disp_tphint event3 
+B: PROP=0
+B: EV=3
+B: KEY=200000000 0 3100000 40000800 1c168000000000 0
+
+=== event2 sysfs
+total 0
+drwxr-xr-x 7 root root    0 2094-10-27 18:13 .
+drwxr-xr-x 5 root root    0 2094-10-27 18:13 ..
+drwxr-xr-x 2 root root    0 2094-10-27 18:13 capabilities
+drwxr-xr-x 3 root root    0 2094-10-27 18:13 event2
+drwxr-xr-x 2 root root    0 2094-10-27 18:13 id
+-r--r--r-- 1 root root 4096 2094-10-27 18:31 modalias
+-r--r--r-- 1 root root 4096 2094-10-27 18:31 name
+-r--r--r-- 1 root root 4096 2094-10-27 18:31 phys
+drwxr-xr-x 2 root root    0 2094-10-27 18:13 power
+-r--r--r-- 1 root root 4096 2094-10-27 18:31 properties
+lrwxrwxrwx 1 root root    0 2094-10-27 18:31 subsystem -> ../../../../class/input
+-rw-r--r-- 1 root root 4096 2094-10-27 18:13 uevent
+-r--r--r-- 1 root root 4096 2094-10-27 18:31 uniq
+drwxr-xr-x 2 root root    0 2094-10-27 18:13 wakeup23
+/sys/devices/virtual/input/input2
+=== spi devices
+total 0
+drwxr-xr-x 2 root root 0 2094-10-27 18:31 .
+drwxr-xr-x 4 root root 0 2094-10-27 18:31 ..
+lrwxrwxrwx 1 root root 0 2094-10-27 18:31 spi0.0 -> ../../../devices/platform/1100a000.spi0/spi_master/spi0/spi0.0
+lrwxrwxrwx 1 root root 0 2094-10-27 18:31 spi1.0 -> ../../../devices/platform/11010000.spi1/spi_master/spi1/spi1.0
+lrwxrwxrwx 1 root root 0 2094-10-27 18:31 spi5.0 -> ../../../devices/platform/11019000.spi5/spi_master/spi5/spi5.0
+--- /sys/bus/spi/devices/spi0.0
+authen_fd
+debug
+driver
+goodix_fp
+modalias
+of_node
+power
+statistics
+subsystem
+uevent
+spi:goodix-fp
+../../../../../../bus/spi/drivers/goodix_fp
+--- /sys/bus/spi/devices/spi1.0
+driver
+misc
+modalias
+of_node
+power
+statistics
+subsystem
+uevent
+spi:p61
+../../../../../../bus/spi/drivers/p61
+--- /sys/bus/spi/devices/spi5.0
+driver
+modalias
+of_node
+power
+statistics
+subsystem
+ts_xsfer_state
+uevent
+spi:spi-for-tp
+../../../../../../bus/spi/drivers/touch_xsfer
+=== dmesg touch
+[  615.267691] [MI_TOUCH][xiaomi_touch_dev_open:14]xiaomi_touch_dev_open
+[  617.732502] [MI_TOUCH][xiaomi_touch_dev_open:14]xiaomi_touch_dev_open
+[  908.534313] [Power/PPM] @ppm_lcmoff_switch: onoff = 1
+[  908.534328] [NVT-ts-spi] nvt_fb_notifier_callback 2979: event=9, *blank=0
+[  908.534452] [NVT-ts-spi] nvt_ts_resume 2882: start
+[  908.534466] [NVT-ts-spi] update_firmware_request 319: filename is novatek_ts_fw.bin
+[  908.534477] [NVT-ts-spi] nvt_get_fw_need_write_size 73: fw_need_write_size = 110592(0x1b000), NVT end flag
+[  908.534485] [NVT-ts-spi] nvt_bin_header_parser 180: ovly_info = 0, ilm_dlm_num = 2, ovly_sec_num = 0, info_sec_num = 13, partition = 15
+[  908.678979] [NVT-ts-spi] nvt_update_firmware 914: Update firmware success! <144478 us>
+[  908.679115] [NVT-ts-spi] nvt_get_fw_info 711: buf[1]=0x0A, buf[2]=0x00, buf[3]=0x00, buf[4]=0x72, buf[5]=0x66, buf[6]=0x03
+[  908.679275] [NVT-ts-spi] nvt_get_fw_info 753: FW type is 0x01, fw_ver=27
+[  908.679483] [NVT-ts-spi] nvt_read_pid 680: PID=5920
+[  909.188694] [NVT-ts-spi] nvt_check_fw_reset_state 642: error, retry=51, buf[1]=0x0A, 0x1F, 0x4F, 0x07, 0x0A
+[  909.188710] [NVT-ts-spi] nvt_irq_enable 239: enable=1, desc->depth=0
+[  909.188724] [NVT-ts-spi] nvt_ts_resume 2927: end
+[ 1008.296152] [NVT-ts-spi] nvt_fb_notifier_callback 2972: event=16, *blank=4
+[ 1008.296155] [NVT-ts-spi] nvt_ts_suspend 2797: start
+[ 1008.296160] [NVT-ts-spi] nvt_irq_enable 239: enable=0, desc->depth=1
+[ 1008.296162] [NVT-ts-spi] nvt_ts_suspend 2815: delay 10 ms
+[ 1008.365667] [NVT-ts-spi] nvt_ts_suspend 2857: end
+[ 1008.540490] [Power/PPM] @ppm_lcmoff_switch: onoff = 0
+=== lsmod
+Module                  Size  Used by
+=== mount debugfs
+asoc
+bdi
+binder
+block
+clk
+debug_enabled
+devinfo
+disp
+displowpower
+dispsys
+dma_buf
+dynamic_debug
+emi_mbw
+extfrag
+f2fs
+fault_around_bytes
+fbconfig
+ged
+goodix_ts
+gpio
+hid
+hwconf_check
+ieee80211
+iio
+ion
+keypad
+m4u
+mali0
+memblock
+mmc0
+mmprofile
+mtk_pmic
+mtk_rtc
+mtkfb
+mtksocanaaudio
+mtksocaudio
+musb-hdrc
+opp
+pinctrl
+pm_qos

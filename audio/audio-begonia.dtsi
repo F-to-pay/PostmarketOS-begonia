@@ -1,0 +1,294 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * EXPERIMENTAL: audio (AFE + MT6359 codec) for the Xiaomi Redmi Note 8 Pro (begonia).
+ *
+ * Included at the end of arch/arm64/boot/dts/mediatek/mt6785-xiaomi-begonia.dts:
+ *     #include "audio-begonia.dtsi"
+ *
+ * The built-in MT6359 codec (earpiece, headphones, analog microphones) +
+ * SmartPA TFA9874 (i2c6@0x34, audio over I2S3) for the loudspeaker, see NOTES.md.
+ * The clock names match the aud_clks[] array in mt6785-afe-clk.c; the clocks
+ * top_i2s6..9 / apll12_div6..9 do not exist on MT6785 - the driver skips them (NULL).
+ */
+
+#include <dt-bindings/clock/mediatek,mt6785-clk.h>
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+#include <dt-bindings/pinctrl/mediatek,mt6785-pinfunc.h>
+#include <dt-bindings/power/mediatek,mt6785-power.h>
+
+&audsys {
+	power-domains = <&spm MT6785_POWER_DOMAIN_AUDIO>;
+
+	afe: audio-controller {
+		compatible = "mediatek,mt6785-audio";
+		interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_LOW>;
+
+		mediatek,apmixedsys = <&apmixedsys>;
+		mediatek,topckgen = <&topckgen>;
+		mediatek,infracfg = <&infracfg>;
+
+		clocks = <&audsys CLK_AUD_AFE>,
+			 <&audsys CLK_AUD_TML>,
+			 <&audsys CLK_AUD_22M>,
+			 <&audsys CLK_AUD_24M>,
+			 <&audsys CLK_AUD_APLL_TUNER>,
+			 <&audsys CLK_AUD_APLL2_TUNER>,
+			 <&audsys CLK_AUD_NLE>,
+			 <&infracfg CLK_INFRA_AUDIO>,
+			 <&infracfg CLK_INFRA_AUDIO_26M>,
+			 <&topckgen CLK_TOP_AUDIO>,
+			 <&topckgen CLK_TOP_AUDIO_INTBUS>,
+			 <&topckgen CLK_TOP_AUDIO1>,
+			 <&apmixedsys CLK_APMIXED_APLL1>,
+			 <&topckgen CLK_TOP_AUDIO2>,
+			 <&apmixedsys CLK_APMIXED_APLL2>,
+			 <&topckgen CLK_TOP_AUDIO_ENG1>,
+			 <&topckgen CLK_TOP_APLL1_D8>,
+			 <&topckgen CLK_TOP_AUDIO_ENG2>,
+			 <&topckgen CLK_TOP_APLL2_D8>,
+			 <&topckgen CLK_TOP_AUDIO_HIRES>,
+			 <&topckgen CLK_TOP_APLL_I2S0>,
+			 <&topckgen CLK_TOP_APLL_I2S1>,
+			 <&topckgen CLK_TOP_APLL_I2S2>,
+			 <&topckgen CLK_TOP_APLL_I2S3>,
+			 <&topckgen CLK_TOP_APLL_I2S4>,
+			 <&topckgen CLK_TOP_APLL_I2S5>,
+			 <&topckgen CLK_TOP_APLL12_DIV0>,
+			 <&topckgen CLK_TOP_APLL12_DIV1>,
+			 <&topckgen CLK_TOP_APLL12_DIV2>,
+			 <&topckgen CLK_TOP_APLL12_DIV3>,
+			 <&topckgen CLK_TOP_APLL12_DIV4>,
+			 <&topckgen CLK_TOP_APLL12_DIVB>,
+			 <&topckgen CLK_TOP_APLL12_DIV5>,
+			 <&clk26m>,
+			 /* ADDA DAPM power (SND_SOC_DAPM_CLOCK_SUPPLY): without them the routes to the DAC/ADC are not built */
+			 <&audsys CLK_AUD_DAC>,
+			 <&audsys CLK_AUD_DAC_PREDIS>,
+			 <&audsys CLK_AUD_3RD_DAC>,
+			 <&audsys CLK_AUD_3RD_DAC_PREDIS>,
+			 <&audsys CLK_AUD_ADC>,
+			 <&audsys CLK_AUD_ADDA6_ADC>;
+		clock-names = "aud_afe_clk",
+			      "aud_tml_clk",
+			      "aud_apll22m_clk",
+			      "aud_apll24m_clk",
+			      "aud_apll1_tuner_clk",
+			      "aud_apll2_tuner_clk",
+			      "aud_nle",
+			      "aud_infra_clk",
+			      "aud_infra_26m_clk",
+			      "top_mux_audio",
+			      "top_mux_audio_int",
+			      "top_mux_aud_1",
+			      "top_apll1_ck",
+			      "top_mux_aud_2",
+			      "top_apll2_ck",
+			      "top_mux_aud_eng1",
+			      "top_apll1_d8",
+			      "top_mux_aud_eng2",
+			      "top_apll2_d8",
+			      "top_mux_audio_h",
+			      "top_i2s0_m_sel",
+			      "top_i2s1_m_sel",
+			      "top_i2s2_m_sel",
+			      "top_i2s3_m_sel",
+			      "top_i2s4_m_sel",
+			      "top_i2s5_m_sel",
+			      "top_apll12_div0",
+			      "top_apll12_div1",
+			      "top_apll12_div2",
+			      "top_apll12_div3",
+			      "top_apll12_div4",
+			      "top_apll12_divb",
+			      "top_apll12_div5",
+			      "top_clk26m_clk",
+			      "aud_dac_clk",
+			      "aud_dac_predis_clk",
+			      "aud_3rd_dac_clk",
+			      "aud_3rd_dac_predis_clk",
+			      "aud_adc_clk",
+			      "aud_adda6_adc_clk";
+	};
+};
+
+&pio {
+	/* MTKAIF PMIC interface: the state names = aud_gpios[] in mt6785-afe-gpio.c */
+	aud_clk_mosi_off: aud-clk-mosi-off-pins {
+		pins-clk {
+			pinmux = <PINMUX_GPIO189__FUNC_GPIO189>,
+				 <PINMUX_GPIO190__FUNC_GPIO190>;
+			input-enable;
+			bias-pull-down;
+		};
+	};
+	aud_clk_mosi_on: aud-clk-mosi-on-pins {
+		pins-clk {
+			pinmux = <PINMUX_GPIO189__FUNC_AUD_CLK_MOSI>,
+				 <PINMUX_GPIO190__FUNC_AUD_SYNC_MOSI>;
+			input-schmitt-enable;
+			bias-disable;
+		};
+	};
+	aud_dat_mosi_off: aud-dat-mosi-off-pins {
+		pins-dat {
+			pinmux = <PINMUX_GPIO191__FUNC_GPIO191>,
+				 <PINMUX_GPIO192__FUNC_GPIO192>;
+			input-enable;
+			bias-pull-down;
+		};
+	};
+	aud_dat_mosi_on: aud-dat-mosi-on-pins {
+		pins-dat {
+			pinmux = <PINMUX_GPIO191__FUNC_AUD_DAT_MOSI0>,
+				 <PINMUX_GPIO192__FUNC_AUD_DAT_MOSI1>;
+			input-schmitt-enable;
+			bias-disable;
+		};
+	};
+	aud_dat_mosi_ch34_off: aud-dat-mosi-ch34-off-pins {
+		pins-dat {
+			pinmux = <PINMUX_GPIO143__FUNC_GPIO143>;
+			input-enable;
+			bias-pull-down;
+		};
+	};
+	aud_dat_mosi_ch34_on: aud-dat-mosi-ch34-on-pins {
+		pins-dat {
+			pinmux = <PINMUX_GPIO143__FUNC_AUD_DAT_MOSI2>;
+			input-schmitt-enable;
+			bias-disable;
+		};
+	};
+	aud_dat_miso_off: aud-dat-miso-off-pins {
+		pins-dat {
+			pinmux = <PINMUX_GPIO193__FUNC_GPIO193>,
+				 <PINMUX_GPIO194__FUNC_GPIO194>;
+			input-enable;
+			bias-pull-down;
+		};
+	};
+	aud_dat_miso_on: aud-dat-miso-on-pins {
+		pins-dat {
+			pinmux = <PINMUX_GPIO193__FUNC_AUD_DAT_MISO0>,
+				 <PINMUX_GPIO194__FUNC_AUD_DAT_MISO1>;
+			input-schmitt-enable;
+			bias-disable;
+		};
+	};
+	aud_dat_miso_ch34_off: aud-dat-miso-ch34-off-pins {
+		pins-dat {
+			pinmux = <PINMUX_GPIO146__FUNC_GPIO146>;
+			input-enable;
+			bias-pull-down;
+		};
+	};
+	aud_dat_miso_ch34_on: aud-dat-miso-ch34-on-pins {
+		pins-dat {
+			pinmux = <PINMUX_GPIO146__FUNC_AUD_DAT_MISO2>;
+			input-schmitt-enable;
+			bias-disable;
+		};
+	};
+
+	/* Speaker: SmartPA TFA9874. I2C6 = GPIO45/46, reset GPIO24, irq GPIO69, audio I2S3 = GPIO67/68/71 */
+	i2c6_pins: i2c6-pins {
+		pins-bus {
+			pinmux = <PINMUX_GPIO45__FUNC_SCL6>,
+				 <PINMUX_GPIO46__FUNC_SDA6>;
+			bias-pull-up;
+		};
+	};
+	tfa9874_pins: tfa9874-pins {
+		pins-reset {
+			pinmux = <PINMUX_GPIO24__FUNC_GPIO24>;
+			output-low;
+		};
+		pins-irq {
+			pinmux = <PINMUX_GPIO69__FUNC_GPIO69>;
+			input-enable;
+			bias-pull-up;
+		};
+	};
+	aud_gpio_i2s3_off: aud-gpio-i2s3-off-pins {
+		pins-i2s3 {
+			pinmux = <PINMUX_GPIO67__FUNC_GPIO67>,
+				 <PINMUX_GPIO68__FUNC_GPIO68>,
+				 <PINMUX_GPIO71__FUNC_GPIO71>;
+			input-enable;
+			bias-pull-down;
+		};
+	};
+	aud_gpio_i2s3_on: aud-gpio-i2s3-on-pins {
+		pins-i2s3 {
+			pinmux = <PINMUX_GPIO67__FUNC_I2S3_LRCK>,
+				 <PINMUX_GPIO68__FUNC_I2S3_DO>,
+				 <PINMUX_GPIO71__FUNC_I2S3_BCK>;
+			bias-disable;
+		};
+	};
+};
+
+/*
+ * 3.5 mm jack detection: ACCDET inside the MT6359 PMIC. The node must be named "accdet" and be a child of the PMIC
+ * (the driver looks it up by name at the parent); compatible is needed for the mt6359-accdet MFD cell. The values are as on
+ * related MediaTek boards (k6853/k6873/k6875): bias 2.8 V, mode 2 (low cost without internal bias).
+ */
+&pmic {
+	accdet: accdet {
+		compatible = "mediatek,mt6359-accdet";
+		mediatek,mic-vol = <8>;
+		mediatek,plugout-debounce = <1>;
+		mediatek,mic-mode = <2>;
+		mediatek,pwm-deb-setting = <0x500 0x500 1 0x1f0
+					    0x800 0x800 0x20 0x44
+					    0x4 0x1
+					    0x5 0x3 0x3 0x5 0xe>;
+		mediatek,three-key-thr = <0 80 220 400>;
+	};
+};
+
+&i2c6 {
+	clock-frequency = <400000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c6_pins>;
+	status = "okay";
+
+	speaker_amp: audio-codec@34 {
+		compatible = "nxp,tfa9874";
+		reg = <0x34>;
+		#sound-dai-cells = <0>;
+		reset-gpios = <&pio 24 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&tfa9874_pins>;
+	};
+};
+
+/ {
+	sound: sound {
+		compatible = "mediatek,mt6785_mt6359";
+		model = "mt6785_mt6359";
+		mediatek,platform = <&afe>;
+		mediatek,accdet = <&accdet>;
+
+		pinctrl-names = "aud_clk_mosi_off", "aud_clk_mosi_on",
+				"aud_dat_mosi_off", "aud_dat_mosi_on",
+				"aud_dat_miso_off", "aud_dat_miso_on",
+				"aud_dat_mosi_ch34_off", "aud_dat_mosi_ch34_on",
+				"aud_dat_miso_ch34_off", "aud_dat_miso_ch34_on",
+				"aud_gpio_i2s3_off", "aud_gpio_i2s3_on";
+		pinctrl-0 = <&aud_clk_mosi_off>;
+		pinctrl-1 = <&aud_clk_mosi_on>;
+		pinctrl-2 = <&aud_dat_mosi_off>;
+		pinctrl-3 = <&aud_dat_mosi_on>;
+		pinctrl-4 = <&aud_dat_miso_off>;
+		pinctrl-5 = <&aud_dat_miso_on>;
+		pinctrl-6 = <&aud_dat_mosi_ch34_off>;
+		pinctrl-7 = <&aud_dat_mosi_ch34_on>;
+		pinctrl-8 = <&aud_dat_miso_ch34_off>;
+		pinctrl-9 = <&aud_dat_miso_ch34_on>;
+		pinctrl-10 = <&aud_gpio_i2s3_off>;
+		pinctrl-11 = <&aud_gpio_i2s3_on>;
+	};
+};

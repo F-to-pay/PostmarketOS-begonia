@@ -1,0 +1,95 @@
+cat: /APKBUILD: No such file or directory
+marketos.org/deviceinfo>
+# Please use double quotes only. You can source this file in shell
+# scripts.
+
+deviceinfo_format_version="0"
+deviceinfo_name="Xiaomi Redmi Note 8 Pro"
+deviceinfo_manufacturer="Xiaomi"
+deviceinfo_codename="xiaomi-begonia"
+deviceinfo_year="2019"
+deviceinfo_arch="aarch64"
+
+# Device related
+deviceinfo_chassis="handset"
+deviceinfo_drm="true"
+deviceinfo_external_storage="true"
+
+# Bootimg related
+deviceinfo_bootimg_custom_args="--header_version 2 --dtb /boot/dtbs/mediatek/mt6785-xiaomi-begonia.dtb --recovery_dtbo /boot/empty.dtbo"
+deviceinfo_generate_bootimg="true"
+
+# Flashing related
+deviceinfo_flash_kernel_on_update="true"
+deviceinfo_flash_method="fastboot"
+deviceinfo_flash_offset_base="0x40078000"
+deviceinfo_flash_offset_dtb="0x0bc08000"
+deviceinfo_flash_offset_kernel="0x00008000"
+deviceinfo_flash_offset_ramdisk="0x07c08000"
+deviceinfo_flash_offset_second="0xbff88000"
+deviceinfo_flash_offset_tags="0x0bc08000"
+deviceinfo_flash_pagesize="2048"
+deviceinfo_flash_sparse="true"
+
+# Required for devices using UFS as storage (instead of e.g. eMMC)
+deviceinfo_rootfs_image_sector_size="4096"
+
+==== kernel-cmdline.conf
+bootopt=64S3,32N2,64N2
+
+==== modules-initfs
+lm36274_bl
+lm363x-regulator
+novatek-nvt-ts-spi
+panel-novatek-nt36672a
+ti-lmu
+
+==== firmware-xiaomi-begonia-touchscreen
+
+total 40
+drwxrwxrwx 1 user1342c user1342c  4096 Oct 27 21:04 .
+drwxrwxrwx 1 user1342c user1342c  4096 Oct 27 21:03 ..
+-rwxrwxrwx 1 user1342c user1342c   144 Oct 27 21:04 apkb.sh
+-rwxrwxrwx 1 user1342c user1342c   435 Oct 27 21:04 apkb2.sh
+-rwxrwxrwx 1 user1342c user1342c   699 Oct 27 21:04 apkb3.sh
+-rwxrwxrwx 1 user1342c user1342c  4523 Oct 27 21:04 apkbuild_dump.txt
+-rwxrwxrwx 1 user1342c user1342c  1351 Oct 27 21:05 apkbuild_dump2.txt
+-rwxrwxrwx 1 user1342c user1342c  1219 Oct 27 20:22 buildenv.sh
+-rwxrwxrwx 1 user1342c user1342c   738 Oct 27 20:06 chk_ntsrc.sh
+-rwxrwxrwx 1 user1342c user1342c   436 Oct 27 20:42 fast.sh
+-rwxrwxrwx 1 user1342c user1342c   490 Oct 27 20:08 g7.sh
+-rwxrwxrwx 1 user1342c user1342c   556 Oct 27 20:08 g7fw.sh
+-rwxrwxrwx 1 user1342c user1342c   343 Oct 27 20:06 grep_down.sh
+-rwxrwxrwx 1 user1342c user1342c 10499 Oct 27 20:05 mainline-spi.c.txt
+-rwxrwxrwx 1 user1342c user1342c  4264 Oct 27 20:08 spi-xiaomi-tp.c.txt
+==== kernel config: touch/spi/regulator/pinctrl options
+2683:CONFIG_INPUT_TOUCHSCREEN=y
+2684:# CONFIG_TOUCHSCREEN_ADS7846 is not set
+2685:# CONFIG_TOUCHSCREEN_AD7877 is not set
+2686:# CONFIG_TOUCHSCREEN_AD7879 is not set
+2687:# CONFIG_TOUCHSCREEN_ADC is not set
+2688:# CONFIG_TOUCHSCREEN_AR1021_I2C is not set
+2689:# CONFIG_TOUCHSCREEN_ATMEL_MXT is not set
+2690:# CONFIG_TOUCHSCREEN_AUO_PIXCIR is not set
+2691:# CONFIG_TOUCHSCREEN_BU21013 is not set
+2692:# CONFIG_TOUCHSCREEN_BU21029 is not set
+2693:# CONFIG_TOUCHSCREEN_CHIPONE_ICN8318 is not set
+2694:# CONFIG_TOUCHSCREEN_CY8CTMA140 is not set
+2695:# CONFIG_TOUCHSCREEN_CY8CTMG110 is not set
+2696:# CONFIG_TOUCHSCREEN_CYTTSP_CORE is not set
+2697:# CONFIG_TOUCHSCREEN_CYTTSP5 is not set
+2698:# CONFIG_TOUCHSCREEN_DYNAPRO is not set
+2699:# CONFIG_TOUCHSCREEN_HAMPSHIRE is not set
+2700:# CONFIG_TOUCHSCREEN_EETI is not set
+2701:# CONFIG_TOUCHSCREEN_EGALAX is not set
+2702:# CONFIG_TOUCHSCREEN_EGALAX_SERIAL is not set
+2703:# CONFIG_TOUCHSCREEN_EXC3000 is not set
+2704:# CONFIG_TOUCHSCREEN_FUJITSU is not set
+2705:# CONFIG_TOUCHSCREEN_GOODIX is not set
+2706:# CONFIG_TOUCHSCREEN_GOODIX_BERLIN_I2C is not set
+2707:# CONFIG_TOUCHSCREEN_GOODIX_BERLIN_SPI is not set
+2708:# CONFIG_TOUCHSCREEN_HIDEEP is not set
+2709:# CONFIG_TOUCHSCREEN_HYCON_HY46XX is not set
+2710:# CONFIG_TOUCHSCREEN_HYNITRON_CSTXXX is not set
+2711:# CONFIG_TOUCHSCREEN_ILI210X is not set
+2712:# CONFIG_TOUCHSCREEN_ILITEK is not set

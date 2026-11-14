@@ -1,0 +1,13 @@
+[Unit]
+Description=Begonia CONSYS WiFi + Bluetooth bring-up (out-of-tree modules)
+After=local-fs.target systemd-modules-load.service
+ConditionPathExists=/home/user/wifi-up.sh
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh /home/user/begonia-wifi-start.sh
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target

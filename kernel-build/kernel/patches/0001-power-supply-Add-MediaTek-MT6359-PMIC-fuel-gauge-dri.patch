@@ -1,0 +1,709 @@
+From 4eb050f06090ddb6416ef59b7a6fb4da714208be Mon Sep 17 00:00:00 2001
+From: Begonia <begonia@localhost>
+Date: Thu, 12 Nov 2026 14:26:26 +0100
+Subject: [PATCH 01/18] power: supply: Add MediaTek MT6359 PMIC fuel gauge
+ driver
+
+The MT6359 PMIC has a coulomb counter and a current ADC (FGADC) that
+measure the battery current in both directions over a sense resistor.
+There was no mainline driver for it, so a board with this PMIC had no
+usable battery power supply (the charger ADC only sees charge current).
+
+Add a driver, instantiated as an MFD cell of the PMIC, that registers a
+"battery" power supply. Current and charge flow come from the FGADC; the
+starting point and the slow drift correction use the open circuit voltage
+with the OCV table and internal resistance of the simple-battery node.
+Register layout and LSB values follow the downstream mt6359_gauge.c.
+---
+ .../bindings/mfd/mediatek,mt6397.yaml         |   5 +
+ .../power/supply/mediatek,mt6359-fgadc.yaml   |  63 ++
+ drivers/mfd/mt6397-core.c                     |   4 +
+ drivers/power/supply/Kconfig                  |  10 +
+ drivers/power/supply/Makefile                 |   1 +
+ drivers/power/supply/mt6359_fgadc.c           | 543 ++++++++++++++++++
+ 6 files changed, 626 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power/supply/mediatek,mt6359-fgadc.yaml
+ create mode 100644 drivers/power/supply/mt6359_fgadc.c
+
+diff --git a/Documentation/devicetree/bindings/mfd/mediatek,mt6397.yaml b/Documentation/devicetree/bindings/mfd/mediatek,mt6397.yaml
+index 6a89b479d..7fac16137 100644
+--- a/Documentation/devicetree/bindings/mfd/mediatek,mt6397.yaml
++++ b/Documentation/devicetree/bindings/mfd/mediatek,mt6397.yaml
+@@ -106,6 +106,11 @@ properties:
+     $ref: /schemas/iio/adc/mediatek,mt6359-auxadc.yaml#
+     unevaluatedProperties: false
+ 
++  fuel-gauge:
++    type: object
++    : /schemas/power/supply/mediatek,mt6359-fgadc.yaml#
++    unevaluatedProperties: false
++
+   audio-codec:
+     type: object
+     description:
+diff --git a/Documentation/devicetree/bindings/power/supply/mediatek,mt6359-fgadc.yaml b/Documentation/devicetree/bindings/power/supply/mediatek,mt6359-fgadc.yaml
+new file mode 100644
+index 000000000..fd4d7bb4b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/power/supply/mediatek,mt6359-fgadc.yaml
+@@ -0,0 +1,63 @@
++# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
++%YAML 1.2
++---
++$id: http://devicetree.org/schemas/power/supply/mediatek,mt6359-fgadc.yaml#
++$schema: http://devicetree.org/meta-schemas/core.yaml#
++
++title: MediaTek MT6359 PMIC fuel gauge (FGADC)
++
++maintainers:
++  - postmarketOS MT6785 mainline contributors
++
++description: |
++  The MT6359 PMIC has a coulomb counter and a current ADC (FGADC) that
++  measure the battery current over a sense resistor. The node is a child of
++  the PMIC node and registers a "battery" power supply.
++
++allOf:
++  - $ref: power-supply.yaml#
++
++properties:
++  compatible:
++    const: mediatek,mt6359-fgadc
++
++  io-channels:
++    maxItems: 1
++    description: Channel measuring the battery voltage.
++
++  io-channel-names:
++    const: voltage
++
++  power-supplies:
++    maxItems: 1
++    description: Charger that reports whether the battery is being charged.
++
++  monitored-battery:
++    description:
++      simple-battery node. Used are the design capacity, voltage limits,
++      factory-internal-resistance-micro-ohms and ocv-capacity-table-0.
++
++  shunt-resistor-micro-ohms:
++    default: 5000
++    description: Sense resistor of the FGADC.
++
++required:
++  - compatible
++  - io-channels
++  - io-channel-names
++  - monitored-battery
++
++unevaluatedProperties: false
++
++examples:
++  - |
++    pmic {
++        fuel-gauge {
++            compatible = "mediatek,mt6359-fgadc";
++            io-channels = <&charger_adc 4>;
++            io-channel-names = "voltage";
++            power-supplies = <&charger>;
++            monitored-battery = <&battery>;
++            shunt-resistor-micro-ohms = <5000>;
++        };
++    };
+diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+index 3e58d0764..0e806d224 100644
+--- a/drivers/mfd/mt6397-core.c
++++ b/drivers/mfd/mt6397-core.c
+@@ -231,6 +231,10 @@ static const struct mfd_cell mt6359_devs[] = {
+ 		.name = "mt6359-auxadc",
+ 		.of_compatible = "mediatek,mt6359-auxadc"
+ 	},
++	{
++		.name = "mt6359-fgadc",
++		.of_compatible = "mediatek,mt6359-fgadc",
++	},
+ 	{ .name = "mt6359-regulator", },
+ 	{
+ 		.name = "mt6359-rtc",
+diff --git a/drivers/power/supply/Kconfig b/drivers/power/supply/Kconfig
+index 79ddb006e..59113baed 100644
+--- a/drivers/power/supply/Kconfig
++++ b/drivers/power/supply/Kconfig
+@@ -657,6 +657,16 @@ config CHARGER_MP2629
+ 	  Battery charger. This driver provides Battery charger power management
+ 	  functions on the systems.
+ 
++config BATTERY_MT6359_FGADC
++	tristate "MediaTek MT6359 PMIC fuel gauge (FGADC)"
++	depends on MFD_MT6397
++	depends on IIO
++	help
++	  Say Y here to enable the battery fuel gauge of the MediaTek MT6359
++	  PMIC. It reads the hardware coulomb counter and the current ADC of
++	  the PMIC and estimates the capacity from them and from the open
++	  circuit voltage of the battery.
++
+ config CHARGER_MT6360
+ 	tristate "Mediatek MT6360 Charger Driver"
+ 	depends on MFD_MT6360
+diff --git a/drivers/power/supply/Makefile b/drivers/power/supply/Makefile
+index 4f5f8e350..759cecc3d 100644
+--- a/drivers/power/supply/Makefile
++++ b/drivers/power/supply/Makefile
+@@ -87,6 +87,7 @@ obj-$(CONFIG_CHARGER_MAX8971)	+= max8971_charger.o
+ obj-$(CONFIG_CHARGER_MAX8997)	+= max8997_charger.o
+ obj-$(CONFIG_CHARGER_MAX8998)	+= max8998_charger.o
+ obj-$(CONFIG_CHARGER_MP2629)	+= mp2629_charger.o
++obj-$(CONFIG_BATTERY_MT6359_FGADC)	+= mt6359_fgadc.o
+ obj-$(CONFIG_CHARGER_MT6360)	+= mt6360_charger.o
+ obj-$(CONFIG_CHARGER_MT6370)	+= mt6370-charger.o
+ obj-$(CONFIG_CHARGER_QCOM_SMBB)	+= qcom_smbb.o
+diff --git a/drivers/power/supply/mt6359_fgadc.c b/drivers/power/supply/mt6359_fgadc.c
+new file mode 100644
+index 000000000..1b579d36e
+--- /dev/null
++++ b/drivers/power/supply/mt6359_fgadc.c
+@@ -0,0 +1,543 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Fuel gauge of the MediaTek MT6359 PMIC (FGADC).
++ *
++ * The PMIC contains a coulomb counter and a current ADC that measure the
++ * battery current over a sense resistor in both directions.  This driver
++ * exposes them as a "battery" power supply:
++ *
++ *  - current and charge flow come from the FGADC (latched read of the
++ *    current register and of the 32 bit coulomb counter, CAR);
++ *  - the starting point and the slow drift correction come from the open
++ *    circuit voltage, using the OCV/capacity table and the internal
++ *    resistance of the "simple-battery" node referenced by
++ *    "monitored-battery";
++ *  - the battery voltage is read from an IIO channel;
++ *  - the charging state is taken from the charger ("power-supplies").
++ *
++ * Register layout and the LSB values follow the downstream MediaTek driver
++ * (mt6359_gauge.c).  Temperature is not taken into account yet.
++ *
++ * Copyright (C) 2025 postmarketOS contributors
++ */
++#include <linux/iio/consumer.h>
++#include <linux/math64.h>
++#include <linux/mfd/mt6397/core.h>
++#include <linux/module.h>
++#include <linux/mutex.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/power_supply.h>
++#include <linux/property.h>
++#include <linux/regmap.h>
++#include <linux/workqueue.h>
++
++/* FGADC registers in the PMIC address space */
++#define FGADC_CON0		0x0d08
++#define   FG_ON			BIT(0)
++#define FGADC_CON1		0x0d0a
++#define   FG_SW_READ_PRE	BIT(0)
++#define   FG_SW_CLEAR		BIT(3)
++#define   FG_LATCHDATA_ST	BIT(15)
++#define FGADC_CAR_CON0		0x0d16	/* coulomb counter [15:0] */
++#define FGADC_CAR_CON1		0x0d18	/* coulomb counter [31:16] */
++#define FGADC_CUR_CON0		0x0d8a	/* signed current, positive = charging */
++
++/* LSB values for the default 5 mOhm sense resistor */
++#define FG_CUR_LSB_NA		610352
++#define FG_CAR_LSB_NAH		85
++#define FG_DEFAULT_RSHUNT_UOHM	5000
++
++#define FG_LATCH_POLL_US	100
++#define FG_LATCH_TIMEOUT_US	20000
++
++#define FG_UPDATE_MS		5000
++#define FG_MIN_SAMPLE_MS	1000
++
++/* re-synchronise with the OCV only while the battery is nearly idle */
++#define FG_RESYNC_STRONG_UA	50000
++#define FG_RESYNC_WEAK_UA	150000
++
++#define FG_DEFAULT_FULL_UAH	4000000
++#define FG_DEFAULT_R_UOHM	100000
++
++struct mt6359_fgadc {
++	struct device *dev;
++	struct regmap *map;
++	struct iio_channel *vbat;
++	struct power_supply *psy;
++	struct power_supply *charger;
++	struct power_supply_battery_info *info;
++	struct delayed_work work;
++	struct mutex lock;		/* protects the state below and the FGADC latch */
++
++	u32 rshunt_uohm;
++
++	unsigned long last_sample;
++	u32 last_car;
++	bool have_car;
++	bool ready;
++	bool valid;
++
++	s64 full_uah;			/* capacity that the OCV table 0..100% maps to */
++	s64 discharged_uah;		/* charge taken out since "full" */
++
++	int vbat_uv;
++	int cur_ua;			/* positive = charging */
++	int ocv_uv;
++	int capacity;
++	int status;
++};
++
++/* ---- OCV table helpers ----------------------------------------------- */
++
++/* discharged charge matching an open circuit voltage, from the OCV table */
++static s64 fgadc_ocv_to_discharged_uah(struct mt6359_fgadc *g, int ocv_uv)
++{
++	const struct power_supply_battery_ocv_table *t;
++	int i, n;
++	s64 cap_milli;
++
++	if (!g->info || !g->info->ocv_table[0] || !g->info->ocv_table_size[0]) {
++		/* no table: linear between the design limits */
++		int vmin = g->info && g->info->voltage_min_design_uv > 0 ?
++			   g->info->voltage_min_design_uv : 3400000;
++		int vmax = g->info && g->info->voltage_max_design_uv > 0 ?
++			   g->info->voltage_max_design_uv : 4350000;
++
++		cap_milli = div_s64((s64)(ocv_uv - vmin) * 100000, vmax - vmin);
++		goto out;
++	}
++
++	t = g->info->ocv_table[0];
++	n = g->info->ocv_table_size[0];
++
++	if (ocv_uv >= t[0].ocv) {
++		cap_milli = t[0].capacity * 1000LL;
++	} else if (ocv_uv <= t[n - 1].ocv) {
++		cap_milli = t[n - 1].capacity * 1000LL;
++	} else {
++		cap_milli = t[n - 1].capacity * 1000LL;
++		for (i = 0; i < n - 1; i++) {
++			if (ocv_uv <= t[i].ocv && ocv_uv > t[i + 1].ocv) {
++				s64 dc = t[i].capacity - t[i + 1].capacity;
++				s64 dv = t[i].ocv - t[i + 1].ocv;
++
++				cap_milli = t[i + 1].capacity * 1000LL +
++					    div64_s64(dc * 1000 * (ocv_uv - t[i + 1].ocv), dv);
++				break;
++			}
++		}
++	}
++out:
++	cap_milli = clamp_t(s64, cap_milli, 0, 100000);
++
++	return div_s64((100000 - cap_milli) * g->full_uah, 100000);
++}
++
++/* ---- hardware access ------------------------------------------------- */
++
++/* latch and read the instantaneous current and the coulomb counter */
++static int fgadc_hw_read(struct mt6359_fgadc *g, int *cur_ua, u32 *car)
++{
++	unsigned int val, cur = 0, car_lo = 0, car_hi = 0;
++	int ret, ret2;
++
++	ret = regmap_update_bits(g->map, FGADC_CON1, FG_SW_READ_PRE, FG_SW_READ_PRE);
++	if (ret)
++		return ret;
++
++	ret = regmap_read_poll_timeout(g->map, FGADC_CON1, val, val & FG_LATCHDATA_ST,
++				       FG_LATCH_POLL_US, FG_LATCH_TIMEOUT_US);
++	if (!ret)
++		ret = regmap_read(g->map, FGADC_CUR_CON0, &cur);
++	if (!ret)
++		ret = regmap_read(g->map, FGADC_CAR_CON0, &car_lo);
++	if (!ret)
++		ret = regmap_read(g->map, FGADC_CAR_CON1, &car_hi);
++
++	/* release the latch regardless of the result */
++	regmap_update_bits(g->map, FGADC_CON1, FG_SW_CLEAR, FG_SW_CLEAR);
++	regmap_update_bits(g->map, FGADC_CON1, FG_SW_READ_PRE, 0);
++	ret2 = regmap_read_poll_timeout(g->map, FGADC_CON1, val, !(val & FG_LATCHDATA_ST),
++					FG_LATCH_POLL_US, FG_LATCH_TIMEOUT_US);
++	regmap_update_bits(g->map, FGADC_CON1, FG_SW_CLEAR, 0);
++
++	if (ret)
++		return ret;
++	if (ret2)
++		return ret2;
++
++	*cur_ua = div_s64((s64)(s16)cur * FG_CUR_LSB_NA * FG_DEFAULT_RSHUNT_UOHM,
++			  1000LL * g->rshunt_uohm);
++	*car = ((car_hi & 0xffff) << 16) | (car_lo & 0xffff);
++	return 0;
++}
++
++static int fgadc_charger_status(struct mt6359_fgadc *g)
++{
++	union power_supply_propval val;
++
++	/* the charger may register after us: look it up again until found */
++	if (!g->charger) {
++		struct power_supply *c = power_supply_get_by_phandle(g->dev->of_node,
++								     "power-supplies");
++
++		if (!IS_ERR_OR_NULL(c))
++			g->charger = c;
++	}
++	if (!g->charger)
++		return POWER_SUPPLY_STATUS_DISCHARGING;
++
++	if (power_supply_get_property(g->charger, POWER_SUPPLY_PROP_ONLINE, &val) ||
++	    !val.intval)
++		return POWER_SUPPLY_STATUS_DISCHARGING;
++
++	if (!power_supply_get_property(g->charger, POWER_SUPPLY_PROP_STATUS, &val) &&
++	    (val.intval == POWER_SUPPLY_STATUS_FULL ||
++	     val.intval == POWER_SUPPLY_STATUS_CHARGING ||
++	     val.intval == POWER_SUPPLY_STATUS_NOT_CHARGING))
++		return val.intval;
++
++	return POWER_SUPPLY_STATUS_CHARGING;
++}
++
++/* ---- the estimator --------------------------------------------------- */
++
++/* caller holds g->lock; returns 1 if the status changed, <0 on error */
++static int fgadc_sample(struct mt6359_fgadc *g, bool force)
++{
++	int cur_ua, vbat_uv, status, ret, ocv, r_uohm;
++	u32 car;
++	int abs_ua;
++
++	if (g->valid && !force &&
++	    time_before(jiffies, g->last_sample + msecs_to_jiffies(FG_MIN_SAMPLE_MS)))
++		return 0;
++
++	ret = fgadc_hw_read(g, &cur_ua, &car);
++	if (ret)
++		return ret;
++	ret = iio_read_channel_processed(g->vbat, &vbat_uv);
++	if (ret < 0)
++		return ret;
++
++	/* coulomb counting; the counter wraps, the difference does not */
++	if (g->have_car) {
++		s32 dcar = (s32)(car - g->last_car);
++
++		g->discharged_uah -= div_s64((s64)dcar * FG_CAR_LSB_NAH * FG_DEFAULT_RSHUNT_UOHM,
++					     1000LL * g->rshunt_uohm);
++	}
++	g->last_car = car;
++	g->have_car = true;
++
++	status = fgadc_charger_status(g);
++	abs_ua = abs(cur_ua);
++
++	/* open circuit voltage: remove the drop over the internal resistance */
++	r_uohm = g->info && g->info->factory_internal_resistance_uohm > 0 ?
++		 g->info->factory_internal_resistance_uohm : FG_DEFAULT_R_UOHM;
++	ocv = vbat_uv - (int)div_s64((s64)cur_ua * r_uohm, 1000000);
++	g->ocv_uv = ocv;
++
++	if (!g->valid) {
++		g->discharged_uah = fgadc_ocv_to_discharged_uah(g, ocv);
++		g->valid = true;
++	} else if (abs_ua < FG_RESYNC_WEAK_UA) {
++		s64 target = fgadc_ocv_to_discharged_uah(g, ocv);
++		int shift = abs_ua < FG_RESYNC_STRONG_UA ? 3 : 5;
++
++		g->discharged_uah += (target - g->discharged_uah) >> shift;
++	}
++
++	if (status == POWER_SUPPLY_STATUS_FULL)
++		g->discharged_uah = 0;
++	g->discharged_uah = clamp_t(s64, g->discharged_uah, 0, g->full_uah);
++
++	g->vbat_uv = vbat_uv;
++	g->cur_ua = cur_ua;
++	g->last_sample = jiffies;
++
++	if (status == POWER_SUPPLY_STATUS_FULL)
++		g->capacity = 100;
++	else
++		g->capacity = clamp_t(int, div64_s64((g->full_uah - g->discharged_uah) * 100 +
++						     g->full_uah / 2, g->full_uah), 0, 100);
++
++	if (status != g->status) {
++		g->status = status;
++		return 1;
++	}
++	return 0;
++}
++
++static void fgadc_work(struct work_struct *work)
++{
++	struct mt6359_fgadc *g = container_of(work, struct mt6359_fgadc, work.work);
++	int old_cap, ret;
++
++	mutex_lock(&g->lock);
++	old_cap = g->capacity;
++	ret = fgadc_sample(g, true);
++	if (ret < 0)
++		dev_warn_ratelimited(g->dev, "sample failed: %d\n", ret);
++	mutex_unlock(&g->lock);
++
++	if (ret > 0 || g->capacity != old_cap)
++		power_supply_changed(g->psy);
++
++	schedule_delayed_work(&g->work, msecs_to_jiffies(FG_UPDATE_MS));
++}
++
++static void fgadc_external_power_changed(struct power_supply *psy)
++{
++	struct mt6359_fgadc *g = power_supply_get_drvdata(psy);
++
++	mod_delayed_work(system_wq, &g->work, msecs_to_jiffies(200));
++}
++
++/* ---- power supply ---------------------------------------------------- */
++
++static int fgadc_get_property(struct power_supply *psy, enum power_supply_property psp,
++			      union power_supply_propval *val)
++{
++	struct mt6359_fgadc *g = power_supply_get_drvdata(psy);
++	int ret = 0;
++
++	mutex_lock(&g->lock);
++	if (!g->ready) {
++		mutex_unlock(&g->lock);
++		return -EAGAIN;
++	}
++
++	/* a fresh sample for the dynamic values, rate limited */
++	switch (psp) {
++	case POWER_SUPPLY_PROP_STATUS:
++	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
++	case POWER_SUPPLY_PROP_VOLTAGE_OCV:
++	case POWER_SUPPLY_PROP_CURRENT_NOW:
++	case POWER_SUPPLY_PROP_CAPACITY:
++	case POWER_SUPPLY_PROP_CAPACITY_LEVEL:
++	case POWER_SUPPLY_PROP_CHARGE_NOW:
++	case POWER_SUPPLY_PROP_TIME_TO_EMPTY_NOW:
++	case POWER_SUPPLY_PROP_TIME_TO_FULL_NOW:
++		fgadc_sample(g, false);
++		break;
++	default:
++		break;
++	}
++
++	switch (psp) {
++	case POWER_SUPPLY_PROP_STATUS:
++		val->intval = g->status;
++		break;
++	case POWER_SUPPLY_PROP_PRESENT:
++		val->intval = 1;
++		break;
++	case POWER_SUPPLY_PROP_TECHNOLOGY:
++		val->intval = g->info && g->info->technology != POWER_SUPPLY_TECHNOLOGY_UNKNOWN ?
++			      g->info->technology : POWER_SUPPLY_TECHNOLOGY_LION;
++		break;
++	case POWER_SUPPLY_PROP_HEALTH:
++		val->intval = POWER_SUPPLY_HEALTH_GOOD;
++		break;
++	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
++		val->intval = g->vbat_uv;
++		break;
++	case POWER_SUPPLY_PROP_VOLTAGE_OCV:
++		val->intval = g->ocv_uv;
++		break;
++	case POWER_SUPPLY_PROP_CURRENT_NOW:
++		val->intval = g->cur_ua;	/* negative while discharging */
++		break;
++	case POWER_SUPPLY_PROP_CAPACITY:
++		val->intval = g->capacity;
++		break;
++	case POWER_SUPPLY_PROP_CAPACITY_LEVEL:
++		if (g->capacity >= 100)
++			val->intval = POWER_SUPPLY_CAPACITY_LEVEL_FULL;
++		else if (g->capacity > 15)
++			val->intval = POWER_SUPPLY_CAPACITY_LEVEL_NORMAL;
++		else if (g->capacity > 5)
++			val->intval = POWER_SUPPLY_CAPACITY_LEVEL_LOW;
++		else
++			val->intval = POWER_SUPPLY_CAPACITY_LEVEL_CRITICAL;
++		break;
++	case POWER_SUPPLY_PROP_CHARGE_NOW:
++		val->intval = g->full_uah - g->discharged_uah;
++		break;
++	case POWER_SUPPLY_PROP_CHARGE_FULL:
++		val->intval = g->full_uah;
++		break;
++	case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
++		if (!g->info || g->info->charge_full_design_uah <= 0)
++			ret = -ENODATA;
++		else
++			val->intval = g->info->charge_full_design_uah;
++		break;
++	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
++		if (!g->info || g->info->voltage_max_design_uv <= 0)
++			ret = -ENODATA;
++		else
++			val->intval = g->info->voltage_max_design_uv;
++		break;
++	case POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN:
++		if (!g->info || g->info->voltage_min_design_uv <= 0)
++			ret = -ENODATA;
++		else
++			val->intval = g->info->voltage_min_design_uv;
++		break;
++	case POWER_SUPPLY_PROP_TIME_TO_EMPTY_NOW:
++		if (g->cur_ua >= -20000)
++			ret = -ENODATA;
++		else
++			val->intval = div_s64((g->full_uah - g->discharged_uah) * 3600,
++					      -g->cur_ua);
++		break;
++	case POWER_SUPPLY_PROP_TIME_TO_FULL_NOW:
++		if (g->cur_ua <= 20000)
++			ret = -ENODATA;
++		else
++			val->intval = div_s64(g->discharged_uah * 3600, g->cur_ua);
++		break;
++	default:
++		ret = -EINVAL;
++	}
++	mutex_unlock(&g->lock);
++
++	return ret;
++}
++
++static const enum power_supply_property fgadc_props[] = {
++	POWER_SUPPLY_PROP_STATUS,
++	POWER_SUPPLY_PROP_PRESENT,
++	POWER_SUPPLY_PROP_TECHNOLOGY,
++	POWER_SUPPLY_PROP_HEALTH,
++	POWER_SUPPLY_PROP_VOLTAGE_NOW,
++	POWER_SUPPLY_PROP_VOLTAGE_OCV,
++	POWER_SUPPLY_PROP_CURRENT_NOW,
++	POWER_SUPPLY_PROP_CAPACITY,
++	POWER_SUPPLY_PROP_CAPACITY_LEVEL,
++	POWER_SUPPLY_PROP_CHARGE_NOW,
++	POWER_SUPPLY_PROP_CHARGE_FULL,
++	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
++	POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
++	POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN,
++	POWER_SUPPLY_PROP_TIME_TO_EMPTY_NOW,
++	POWER_SUPPLY_PROP_TIME_TO_FULL_NOW,
++};
++
++static const struct power_supply_desc fgadc_desc = {
++	.name = "battery",
++	.type = POWER_SUPPLY_TYPE_BATTERY,
++	.properties = fgadc_props,
++	.num_properties = ARRAY_SIZE(fgadc_props),
++	.get_property = fgadc_get_property,
++	.external_power_changed = fgadc_external_power_changed,
++};
++
++/* ---- probe ----------------------------------------------------------- */
++
++static void fgadc_put_info(void *data)
++{
++	struct mt6359_fgadc *g = data;
++
++	power_supply_put_battery_info(g->psy, g->info);
++}
++
++static void fgadc_cancel(void *data)
++{
++	cancel_delayed_work_sync(&((struct mt6359_fgadc *)data)->work);
++}
++
++static int fgadc_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct mt6397_chip *chip = dev_get_drvdata(dev->parent);
++	struct power_supply_config cfg = {};
++	struct mt6359_fgadc *g;
++	unsigned int val;
++	int ret;
++
++	g = devm_kzalloc(dev, sizeof(*g), GFP_KERNEL);
++	if (!g)
++		return -ENOMEM;
++
++	g->dev = dev;
++	g->map = chip->regmap;
++	g->status = POWER_SUPPLY_STATUS_DISCHARGING;
++	g->full_uah = FG_DEFAULT_FULL_UAH;
++	g->rshunt_uohm = FG_DEFAULT_RSHUNT_UOHM;
++	mutex_init(&g->lock);
++	INIT_DELAYED_WORK(&g->work, fgadc_work);
++
++	device_property_read_u32(dev, "shunt-resistor-micro-ohms", &g->rshunt_uohm);
++	if (!g->rshunt_uohm)
++		return dev_err_probe(dev, -EINVAL, "invalid shunt resistor\n");
++
++	g->vbat = devm_iio_channel_get(dev, "voltage");
++	if (IS_ERR(g->vbat))
++		return dev_err_probe(dev, PTR_ERR(g->vbat), "no voltage channel\n");
++
++	ret = regmap_read(g->map, FGADC_CON0, &val);
++	if (ret)
++		return dev_err_probe(dev, ret, "cannot read the FGADC\n");
++	if (!(val & FG_ON)) {
++		dev_info(dev, "FGADC was off, switching it on\n");
++		regmap_update_bits(g->map, FGADC_CON0, FG_ON, FG_ON);
++	}
++
++	cfg.drv_data = g;
++	cfg.fwnode = dev_fwnode(dev);
++	g->psy = devm_power_supply_register(dev, &fgadc_desc, &cfg);
++	if (IS_ERR(g->psy))
++		return dev_err_probe(dev, PTR_ERR(g->psy), "cannot register the power supply\n");
++
++	ret = power_supply_get_battery_info(g->psy, &g->info);
++	if (ret) {
++		dev_warn(dev, "no monitored-battery (%d), using defaults\n", ret);
++		g->info = NULL;
++	} else {
++		if (g->info->charge_full_design_uah > 0)
++			g->full_uah = g->info->charge_full_design_uah;
++		ret = devm_add_action_or_reset(dev, fgadc_put_info, g);
++		if (ret)
++			return ret;
++	}
++
++	ret = devm_add_action_or_reset(dev, fgadc_cancel, g);
++	if (ret)
++		return ret;
++
++	mutex_lock(&g->lock);
++	ret = fgadc_sample(g, true);
++	g->ready = ret >= 0;
++	mutex_unlock(&g->lock);
++	if (ret < 0)
++		return dev_err_probe(dev, ret, "first sample failed\n");
++
++	dev_info(dev, "%d mV, %d mA, ocv %d mV, %d%%, %lld mAh\n", g->vbat_uv / 1000,
++		 g->cur_ua / 1000, g->ocv_uv / 1000, g->capacity, div_s64(g->full_uah, 1000));
++
++	schedule_delayed_work(&g->work, msecs_to_jiffies(FG_UPDATE_MS));
++	return 0;
++}
++
++static const struct of_device_id fgadc_of_match[] = {
++	{ .compatible = "mediatek,mt6359-fgadc" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, fgadc_of_match);
++
++static struct platform_driver fgadc_driver = {
++	.probe = fgadc_probe,
++	.driver = {
++		.name = "mt6359-fgadc",
++		.of_match_table = fgadc_of_match,
++	},
++};
++module_platform_driver(fgadc_driver);
++
++MODULE_DESCRIPTION("MediaTek MT6359 PMIC fuel gauge (FGADC)");
++MODULE_LICENSE("GPL");

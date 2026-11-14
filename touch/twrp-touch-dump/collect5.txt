@@ -1,0 +1,48 @@
+=== spi5@11019000
+  #address-cells =  00 00 00 01
+  #size-cells =  00 00 00 00
+  clock-names = parent-clk sel-clk spi-clk 
+  clocks =  00 00 00 12 00 00 00 37 00 00 00 12 00 00 00 07 00 00 00 21 00 00 00 4d
+  compatible = mediatek,mt6765-spi 
+  interrupts =  00 00 00 00 00 00 00 9d 00 00 00 08
+  mediatek,pad-select =  00 00 00 00
+  name = spi5 
+  phandle =  00 00 01 13
+  reg =  00 00 00 00 11 01 90 00 00 00 00 00 00 00 10 00
+=== spi5@11019000 children
+#address-cells
+#size-cells
+clock-names
+clocks
+compatible
+interrupts
+mediatek,pad-select
+name
+phandle
+reg
+touch_spi@0
+=== __symbols__ pmx_ts / spi5 pinctrl
+flashlights_mt6360
+mt_pmic_vtp_ldo_reg
+spi5
+touch
+ts_focal
+ts_novatek
+xiaomi_touch
+=== pinctrl-maps (ts/spi5/nvt)
+device ts_novatek
+state pmx_ts_active
+device ts_novatek
+state pmx_ts_active
+device ts_novatek
+state pmx_ts_active
+device ts_novatek
+state pmx_ts_active
+device ts_novatek
+state pmx_ts_suspend
+device ts_novatek
+state pmx_ts_suspend
+device ts_novatek
+state pmx_ts_suspend
+device ts_novatek
+state pmx_ts_suspend

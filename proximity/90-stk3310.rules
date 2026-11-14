@@ -1,0 +1,2 @@
+# stk3310 proximity/light sensor on the Redmi Note 8 Pro: the default (gain x1, 185 us) does not see a hand
+SUBSYSTEM=="iio", ATTR{name}=="stk3310", ATTR{in_proximity_scale}="0.1", ATTR{in_proximity_integration_time}="0.002960"

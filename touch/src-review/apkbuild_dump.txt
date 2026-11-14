@@ -1,0 +1,142 @@
+================ testing/linux-postmarketos-mediatek-mt6785/APKBUILD
+# Kernel config based on: arch/arm64/configs/defconfig
+maintainer="Dinolek <git@dinolek.me>"
+_flavor="postmarketos-mediatek-mt6785"
+pkgname=linux-$_flavor
+pkgver=6.16.4
+pkgrel=1
+pkgdesc="Mainline kernel fork for MT6785"
+arch="aarch64"
+_carch="arm64"
+url="https://gitlab.postmarketos.org/mt6785-mainline/linux"
+license="GPL-2.0-only"
+options="
+	!check
+	!strip
+	!tracedeps
+	pmb:cross-native
+	pmb:kconfigcheck-community
+"
+makedepends="
+	bison
+	clang
+	elfutils-dev
+	findutils
+	flex
+	linux-headers
+	lld
+	llvm
+	openssl-dev
+	pahole
+	perl
+	postmarketos-installkernel
+	python3
+	zstd
+"
+
+# Source
+_tag="$pkgver-r0"
+_config="config-$_flavor.$arch"
+source="
+	https://gitlab.postmarketos.org/mt6785-mainline/linux/-/archive/$_tag/linux-$_tag.tar.gz
+	$_config
+"
+builddir="$srcdir/linux-$_tag"
+
+prepare() {
+	default_prepare
+	cp "$srcdir/config-$_flavor.$arch" .config
+}
+
+build() {
+	unset LDFLAGS
+	make ARCH="$_carch" LLVM=1 HOSTLDFLAGS="-fuse-ld=lld" \
+		KBUILD_BUILD_VERSION="$((pkgrel + 1))-$_flavor"
+}
+
+package() {
+	mkdir -p "$pkgdir"/boot
+
+	make dtbs_install modules_install zinstall \
+		ARCH="$_carch" \
+		LLVM=1 \
+		INSTALL_PATH="$pkgdir"/boot/ \
+		INSTALL_MOD_PATH="$pkgdir"/usr \
+		INSTALL_MOD_STRIP=1 \
+		INSTALL_DTBS_PATH="$pkgdir"/boot/dtbs
+	rm -f "$pkgdir"/usr/lib/modules/*/build "$pkgdir"/usr/lib/modules/*/source
+
+	install -D "$builddir"/include/config/kernel.release \
+		"$pkgdir"/usr/share/kernel/"$_flavor"/kernel.release
+}
+
+sha512sums="
+d65e1b9fb3950b6535bbe8b901809f2ff790f52adadb3f0a6e1bb48c0b39949ef49e08bd9e5ba9f5f632a0ad1cd18abba5d8316d33ad1ebc887fce59a0a94489  linux-6.16.4-r0.tar.gz
+3a403015d0f2d56218793ebdeddd786efcad2a40d059d08cbc875dc42f8593ae3585b050195693eb10c3eaa24411d115b247ad651b65efe00df95aedab0271f0  config-postmarketos-mediatek-mt6785.aarch64
+"
+--- files:
+total 256
+drwxrwxrwx   2 user1342c user1342c   4096 Oct 25 21:19 .
+drwxrwxrwx 342 user1342c user1342c  20480 Oct 25 21:19 ..
+-rwxrwxrwx   1 user1342c user1342c   1769 Oct 25 21:19 APKBUILD
+-rwxrwxrwx   1 user1342c user1342c 225732 Oct 25 21:19 config-postmarketos-mediatek-mt6785.aarch64
+================ testing/device-xiaomi-begonia/APKBUILD
+# Reference: <https://postmarketos.org/devicepkg>
+maintainer="Dinolek <git@dinolek.me>"
+pkgname=device-xiaomi-begonia
+pkgdesc="Xiaomi Redmi Note 8 Pro"
+pkgver=6
+pkgrel=0
+url="https://postmarketos.org"
+license="MIT"
+arch="aarch64"
+options="!check !archcheck"
+depends="
+	firmware-xiaomi-begonia-touchscreen
+	linux-postmarketos-mediatek-mt6785
+	mesa-vulkan-panfrost
+	mkbootimg
+	postmarketos-base
+"
+makedepends="android-tools devicepkg-dev dtc"
+source="deviceinfo kernel-cmdline.conf modules-initfs"
+
+build() {
+	devicepkg_build $startdir $pkgname
+
+	# begonia bootloader needs empty dtbo, build it and add as recovery_dtbo to final image
+	mkdir "$builddir"
+	echo '/dts-v1/;/{};' | dtc -I dts -O dtb -o "$builddir/empty.dtb"
+	mkdtboimg create "$builddir/empty.dtbo" "$builddir/empty.dtb"
+}
+
+package() {
+	devicepkg_package $startdir $pkgname
+
+	mkdir -p "$pkgdir/boot"
+	install -Dm644 "$builddir/empty.dtbo" \
+		"$pkgdir/boot/"
+}
+
+sha512sums="
+fd1e2f16accb71086e49311966e9fb41f9c626bfea6e9dc8b649cc0a4cb7935a0ac2fc23da6c5ff7effff0dc33ab3aa7bdcf036be8d56888609bf5bc6c05d6cf  deviceinfo
+d89b08ef9888faae6cb96a378421669e6119023307a3b5a109e18b7f9e2c70e1f8b240ba8f9b9d22d319fa28e416565d06074d34382f482c9b037b7ab3f4861c  kernel-cmdline.conf
+fb17475e434aa5c1c7ee3103ef3dc5bd1d663184764d770f5c4944a2ea1901fc5351296ca5dc8e3dc3bf74aac1718f49b932f8be0b39add770c5851c708482b8  modules-initfs
+"
+--- files:
+total 44
+drwxrwxrwx   2 user1342c user1342c  4096 Oct 25 21:19 .
+drwxrwxrwx 342 user1342c user1342c 20480 Oct 25 21:19 ..
+-rwxrwxrwx   1 user1342c user1342c  1374 Oct 25 21:19 APKBUILD
+-rwxrwxrwx   1 user1342c user1342c  1145 Oct 25 21:19 deviceinfo
+-rwxrwxrwx   1 user1342c user1342c    23 Oct 25 21:19 kernel-cmdline.conf
+-rwxrwxrwx   1 user1342c user1342c    77 Oct 25 21:19 modules-initfs
+================ git log (mt6785 kernel pkg)
+bb84c79b74 linux-postmarketos-mediatek-mt6785: build with LLVM
+67bc6ac0d3 device/*: Drop redundant deviceinfo variable assignments
+0648d45d76 device/*: migrate device packages to new kernel cmdline config system
+ecd710af96 */*: move to maintainer= variables
+8624b297e6 device/*: Resolve deviceinfo errors highlighted by dint
+9c8c46f803 device-xiaomi-begonia: new aport
+99b95928e6 linux-postmarketos-mediatek-mt6785: new aport
+a45ad4b1b1 device/testing/*: split downstream ports into new downstream category

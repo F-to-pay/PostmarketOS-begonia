@@ -1,0 +1,1140 @@
+diff -ru --strip-trailing-cr '--exclude=*.o' '--exclude=*.ko' '--exclude=*.cmd' '--exclude=*.mod' '--exclude=*.mod.c' '--exclude=Module.symvers' '--exclude=modules.order' '--exclude=build.out' '--exclude=errors.txt' '--exclude=.*.cmd' '--exclude=*.a' a/Makefile b/Makefile
+--- a/Makefile	2026-11-10 23:25:13.976322080 +0100
++++ b/Makefile	2026-11-11 11:21:50.517262696 +0100
+@@ -737,3 +737,5 @@
+ ifneq ($(findstring UT_TEST_MODE,$(MTK_COMBO_CHIP)),)
+ include $(src)/test/ut.make
+ endif
++
++ccflags-y += -Wno-error -Wno-missing-prototypes -Wno-macro-redefined -Wno-null-pointer-subtraction -Wno-cast-function-type-strict -Wno-implicit-fallthrough -Wno-array-bounds -ferror-limit=0
+diff -ru --strip-trailing-cr '--exclude=*.o' '--exclude=*.ko' '--exclude=*.cmd' '--exclude=*.mod' '--exclude=*.mod.c' '--exclude=Module.symvers' '--exclude=modules.order' '--exclude=build.out' '--exclude=errors.txt' '--exclude=.*.cmd' '--exclude=*.a' a/os/linux/gl_cfg80211.c b/os/linux/gl_cfg80211.c
+--- a/os/linux/gl_cfg80211.c	2026-11-10 23:25:14.368777569 +0100
++++ b/os/linux/gl_cfg80211.c	2026-11-11 11:21:50.508459103 +0100
+@@ -4045,19 +4045,19 @@
+ 
+ 	if (params == NULL)
+ 		return 0;
+-	else if (params->supported_rates == NULL)
++	else if (params->link_sta_params.supported_rates == NULL)
+ 		return 0;
+ 
+ 	/* init */
+ 	kalMemZero(&rCmdUpdate, sizeof(rCmdUpdate));
+ 	kalMemCopy(rCmdUpdate.aucPeerMac, mac, 6);
+ 
+-	if (params->supported_rates != NULL) {
++	if (params->link_sta_params.supported_rates != NULL) {
+ 
+-		u4Temp = params->supported_rates_len;
++		u4Temp = params->link_sta_params.supported_rates_len;
+ 		if (u4Temp > CMD_PEER_UPDATE_SUP_RATE_MAX)
+ 			u4Temp = CMD_PEER_UPDATE_SUP_RATE_MAX;
+-		kalMemCopy(rCmdUpdate.aucSupRate, params->supported_rates,
++		kalMemCopy(rCmdUpdate.aucSupRate, params->link_sta_params.supported_rates,
+ 			   u4Temp);
+ 		rCmdUpdate.u2SupRateLen = u4Temp;
+ 	}
+@@ -4080,30 +4080,30 @@
+ 		rCmdUpdate.u2ExtCapLen = u4Temp;
+ 	}
+ 
+-	if (params->ht_capa != NULL) {
++	if (params->link_sta_params.ht_capa != NULL) {
+ 
+-		rCmdUpdate.rHtCap.u2CapInfo = params->ht_capa->cap_info;
++		rCmdUpdate.rHtCap.u2CapInfo = params->link_sta_params.ht_capa->cap_info;
+ 		rCmdUpdate.rHtCap.ucAmpduParamsInfo =
+-			params->ht_capa->ampdu_params_info;
++			params->link_sta_params.ht_capa->ampdu_params_info;
+ 		rCmdUpdate.rHtCap.u2ExtHtCapInfo =
+-			params->ht_capa->extended_ht_cap_info;
++			params->link_sta_params.ht_capa->extended_ht_cap_info;
+ 		rCmdUpdate.rHtCap.u4TxBfCapInfo =
+-			params->ht_capa->tx_BF_cap_info;
++			params->link_sta_params.ht_capa->tx_BF_cap_info;
+ 		rCmdUpdate.rHtCap.ucAntennaSelInfo =
+-			params->ht_capa->antenna_selection_info;
++			params->link_sta_params.ht_capa->antenna_selection_info;
+ 		kalMemCopy(rCmdUpdate.rHtCap.rMCS.arRxMask,
+-			   params->ht_capa->mcs.rx_mask,
++			   params->link_sta_params.ht_capa->mcs.rx_mask,
+ 			   sizeof(rCmdUpdate.rHtCap.rMCS.arRxMask));
+ 
+ 		rCmdUpdate.rHtCap.rMCS.u2RxHighest =
+-			params->ht_capa->mcs.rx_highest;
++			params->link_sta_params.ht_capa->mcs.rx_highest;
+ 		rCmdUpdate.rHtCap.rMCS.ucTxParams =
+-			params->ht_capa->mcs.tx_params;
++			params->link_sta_params.ht_capa->mcs.tx_params;
+ 		rCmdUpdate.fgIsSupHt = TRUE;
+ 	}
+ 	/* vht */
+ 
+-	if (params->vht_capa != NULL) {
++	if (params->link_sta_params.vht_capa != NULL) {
+ 		/* rCmdUpdate.rVHtCap */
+ 		/* rCmdUpdate.rVHtCap */
+ 	}
+@@ -4171,19 +4171,19 @@
+ 
+ 	if (params == NULL)
+ 		return 0;
+-	else if (params->supported_rates == NULL)
++	else if (params->link_sta_params.supported_rates == NULL)
+ 		return 0;
+ 
+ 	/* init */
+ 	kalMemZero(&rCmdUpdate, sizeof(rCmdUpdate));
+ 	kalMemCopy(rCmdUpdate.aucPeerMac, mac, 6);
+ 
+-	if (params->supported_rates != NULL) {
++	if (params->link_sta_params.supported_rates != NULL) {
+ 
+-		u4Temp = params->supported_rates_len;
++		u4Temp = params->link_sta_params.supported_rates_len;
+ 		if (u4Temp > CMD_PEER_UPDATE_SUP_RATE_MAX)
+ 			u4Temp = CMD_PEER_UPDATE_SUP_RATE_MAX;
+-		kalMemCopy(rCmdUpdate.aucSupRate, params->supported_rates,
++		kalMemCopy(rCmdUpdate.aucSupRate, params->link_sta_params.supported_rates,
+ 			   u4Temp);
+ 		rCmdUpdate.u2SupRateLen = u4Temp;
+ 	}
+@@ -4206,30 +4206,30 @@
+ 		rCmdUpdate.u2ExtCapLen = u4Temp;
+ 	}
+ 
+-	if (params->ht_capa != NULL) {
++	if (params->link_sta_params.ht_capa != NULL) {
+ 
+-		rCmdUpdate.rHtCap.u2CapInfo = params->ht_capa->cap_info;
++		rCmdUpdate.rHtCap.u2CapInfo = params->link_sta_params.ht_capa->cap_info;
+ 		rCmdUpdate.rHtCap.ucAmpduParamsInfo =
+-			params->ht_capa->ampdu_params_info;
++			params->link_sta_params.ht_capa->ampdu_params_info;
+ 		rCmdUpdate.rHtCap.u2ExtHtCapInfo =
+-			params->ht_capa->extended_ht_cap_info;
++			params->link_sta_params.ht_capa->extended_ht_cap_info;
+ 		rCmdUpdate.rHtCap.u4TxBfCapInfo =
+-			params->ht_capa->tx_BF_cap_info;
++			params->link_sta_params.ht_capa->tx_BF_cap_info;
+ 		rCmdUpdate.rHtCap.ucAntennaSelInfo =
+-			params->ht_capa->antenna_selection_info;
++			params->link_sta_params.ht_capa->antenna_selection_info;
+ 		kalMemCopy(rCmdUpdate.rHtCap.rMCS.arRxMask,
+-			   params->ht_capa->mcs.rx_mask,
++			   params->link_sta_params.ht_capa->mcs.rx_mask,
+ 			   sizeof(rCmdUpdate.rHtCap.rMCS.arRxMask));
+ 
+ 		rCmdUpdate.rHtCap.rMCS.u2RxHighest =
+-			params->ht_capa->mcs.rx_highest;
++			params->link_sta_params.ht_capa->mcs.rx_highest;
+ 		rCmdUpdate.rHtCap.rMCS.ucTxParams =
+-			params->ht_capa->mcs.tx_params;
++			params->link_sta_params.ht_capa->mcs.tx_params;
+ 		rCmdUpdate.fgIsSupHt = TRUE;
+ 	}
+ 	/* vht */
+ 
+-	if (params->vht_capa != NULL) {
++	if (params->link_sta_params.vht_capa != NULL) {
+ 		/* rCmdUpdate.rVHtCap */
+ 		/* rCmdUpdate.rVHtCap */
+ 	}
+@@ -6255,7 +6255,7 @@
+ int mtk_cfg_start_radar_detection(struct wiphy *wiphy,
+ 				  struct net_device *dev,
+ 				  struct cfg80211_chan_def *chandef,
+-				  unsigned int cac_time_ms)
++				  unsigned int cac_time_ms, int link_id)
+ {
+ 	struct GLUE_INFO *prGlueInfo = NULL;
+ 
+@@ -6516,7 +6516,7 @@
+ }
+ 
+ int mtk_cfg_add_key(struct wiphy *wiphy,
+-		    struct net_device *ndev, u8 key_index,
++		    struct net_device *ndev, int link_id, u8 key_index,
+ 		    bool pairwise, const u8 *mac_addr,
+ 		    struct key_params *params)
+ {
+@@ -6540,7 +6540,7 @@
+ }
+ 
+ int mtk_cfg_get_key(struct wiphy *wiphy,
+-		    struct net_device *ndev, u8 key_index,
++		    struct net_device *ndev, int link_id, u8 key_index,
+ 		    bool pairwise, const u8 *mac_addr, void *cookie,
+ 		    void (*callback)(void *cookie, struct key_params *))
+ {
+@@ -6563,7 +6563,7 @@
+ }
+ 
+ int mtk_cfg_del_key(struct wiphy *wiphy,
+-		    struct net_device *ndev, u8 key_index,
++		    struct net_device *ndev, int link_id, u8 key_index,
+ 		    bool pairwise, const u8 *mac_addr)
+ {
+ 	struct GLUE_INFO *prGlueInfo = NULL;
+@@ -6586,6 +6586,7 @@
+ 
+ int mtk_cfg_set_default_key(struct wiphy *wiphy,
+ 			    struct net_device *ndev,
++			    int link_id,
+ 			    u8 key_index, bool unicast, bool multicast)
+ {
+ 	struct GLUE_INFO *prGlueInfo = NULL;
+@@ -6607,7 +6608,7 @@
+ }
+ 
+ int mtk_cfg_set_default_mgmt_key(struct wiphy *wiphy,
+-		struct net_device *ndev, u8 key_index)
++		struct net_device *ndev, int link_id, u8 key_index)
+ {
+ 	struct GLUE_INFO *prGlueInfo = NULL;
+ 
+@@ -6737,19 +6738,19 @@
+ #if KERNEL_VERSION(3, 18, 0) <= CFG80211_VERSION_CODE
+ int mtk_cfg_tdls_mgmt(struct wiphy *wiphy,
+ 		      struct net_device *dev,
+-		      const u8 *peer, u8 action_code, u8 dialog_token,
++		      const u8 *peer, int link_id, u8 action_code, u8 dialog_token,
+ 		      u16 status_code, u32 peer_capability,
+ 		      bool initiator, const u8 *buf, size_t len)
+ #elif KERNEL_VERSION(3, 16, 0) <= CFG80211_VERSION_CODE
+ int mtk_cfg_tdls_mgmt(struct wiphy *wiphy,
+ 		      struct net_device *dev,
+-		      const u8 *peer, u8 action_code, u8 dialog_token,
++		      const u8 *peer, int link_id, u8 action_code, u8 dialog_token,
+ 		      u16 status_code, u32 peer_capability,
+ 		      const u8 *buf, size_t len)
+ #else
+ int mtk_cfg_tdls_mgmt(struct wiphy *wiphy,
+ 		      struct net_device *dev,
+-		      u8 *peer, u8 action_code, u8 dialog_token,
++		      u8 *peer, int link_id, u8 action_code, u8 dialog_token,
+ 		      u16 status_code,
+ 		      const u8 *buf, size_t len)
+ #endif
+@@ -7253,6 +7254,16 @@
+ 	}
+ }
+ 
++/* 6.x: instead of mgmt_frame_register the kernel calls update_mgmt_frame_registrations with the whole mask */
++void mtk_cfg_update_mgmt_frame_registrations(struct wiphy *wiphy, struct wireless_dev *wdev,
++					     struct mgmt_frame_regs *upd)
++{
++	int i;
++
++	for (i = 0; i < 16; i++)
++		mtk_cfg_mgmt_frame_register(wiphy, wdev, i << 4, !!(upd->interface_stypes & BIT(i)));
++}
++
+ #ifdef CONFIG_NL80211_TESTMODE
+ #if KERNEL_VERSION(3, 12, 0) <= CFG80211_VERSION_CODE
+ int mtk_cfg_testmode_cmd(struct wiphy *wiphy,
+@@ -7395,8 +7406,9 @@
+ 
+ int mtk_cfg_change_beacon(struct wiphy *wiphy,
+ 			  struct net_device *dev,
+-			  struct cfg80211_beacon_data *info)
++			  struct cfg80211_ap_update *ap_update)
+ {
++	struct cfg80211_beacon_data *info = &ap_update->beacon;
+ 	struct GLUE_INFO *prGlueInfo = NULL;
+ 
+ 	prGlueInfo = (struct GLUE_INFO *) wiphy_priv(wiphy);
+@@ -7415,7 +7427,7 @@
+ }
+ 
+ int mtk_cfg_stop_ap(struct wiphy *wiphy,
+-		    struct net_device *dev)
++		    struct net_device *dev, unsigned int link_id)
+ {
+ 	struct GLUE_INFO *prGlueInfo = NULL;
+ 
+@@ -7452,6 +7464,7 @@
+ 
+ int mtk_cfg_set_bitrate_mask(struct wiphy *wiphy,
+ 			     struct net_device *dev,
++			     unsigned int link_id,
+ 			     const u8 *peer,
+ 			     const struct cfg80211_bitrate_mask *mask)
+ {
+@@ -7496,6 +7509,7 @@
+ 
+ int mtk_cfg_get_txpower(struct wiphy *wiphy,
+ 			struct wireless_dev *wdev,
++			unsigned int link_id,
+ 			int *dbm)
+ {
+ 	struct GLUE_INFO *prGlueInfo = NULL;
+diff -ru --strip-trailing-cr '--exclude=*.o' '--exclude=*.ko' '--exclude=*.cmd' '--exclude=*.mod' '--exclude=*.mod.c' '--exclude=Module.symvers' '--exclude=modules.order' '--exclude=build.out' '--exclude=errors.txt' '--exclude=.*.cmd' '--exclude=*.a' a/os/linux/gl_init.c b/os/linux/gl_init.c
+--- a/os/linux/gl_init.c	2026-11-10 23:25:14.382544444 +0100
++++ b/os/linux/gl_init.c	2026-11-11 11:21:50.511104371 +0100
+@@ -126,7 +126,7 @@
+ 
+ MODULE_AUTHOR(NIC_AUTHOR);
+ MODULE_DESCRIPTION(NIC_DESC);
+-MODULE_SUPPORTED_DEVICE(NIC_NAME);
++/* MODULE_SUPPORTED_DEVICE removed in kernel >= 5.12 */
+ 
+ /* MODULE_LICENSE("MTK Propietary"); */
+ MODULE_LICENSE("Dual BSD/GPL");
+@@ -502,7 +502,7 @@
+ 	.cancel_remain_on_channel = mtk_cfg_cancel_remain_on_channel,
+ 	.mgmt_tx = mtk_cfg_mgmt_tx,
+ 	/* .mgmt_tx_cancel_wait        = mtk_cfg80211_mgmt_tx_cancel_wait, */
+-	.mgmt_frame_register = mtk_cfg_mgmt_frame_register,
++	.update_mgmt_frame_registrations = mtk_cfg_update_mgmt_frame_registrations,
+ 
+ #ifdef CONFIG_NL80211_TESTMODE
+ 	.testmode_cmd = mtk_cfg_testmode_cmd,
+@@ -1688,7 +1688,7 @@
+ 	spin_lock_init(&prNetDevPrivate->napi_spinlock);
+ 	prNetDevPrivate->napi.dev = prDev;
+ 	netif_napi_add(prNetDevPrivate->napi.dev,
+-		&prNetDevPrivate->napi, kal_napi_poll, 64);
++		&prNetDevPrivate->napi, kal_napi_poll);
+ 	DBGLOG(INIT, INFO,
+ 		"GRO interface added successfully:%p\n", prDev);
+ #endif
+@@ -1758,7 +1758,7 @@
+ 		wlanGetBssIdx(ndev));
+ 
+ 	COPY_MAC_ADDR(prAisBssInfo->aucOwnMacAddr, sa->sa_data);
+-	COPY_MAC_ADDR(ndev->dev_addr, sa->sa_data);
++	eth_hw_addr_set(ndev, (const u8 *)sa->sa_data);
+ 	DBGLOG(INIT, INFO,
+ 		"[wlan%d] Set connect random macaddr to " MACSTR ".\n",
+ 		prAisBssInfo->ucBssIndex,
+@@ -4177,8 +4177,7 @@
+ 			DBGLOG(INIT, WARN, "set MAC addr fail 0x%x\n",
+ 							rStatus);
+ 		} else {
+-			kalMemCopy(prGlueInfo->prDevHandler->dev_addr,
+-					&MacAddr.sa_data, ETH_ALEN);
++			eth_hw_addr_set(prGlueInfo->prDevHandler, (const u8 *)&MacAddr.sa_data);
+ 			kalMemCopy(prGlueInfo->prDevHandler->perm_addr,
+ 					prGlueInfo->prDevHandler->dev_addr,
+ 					ETH_ALEN);
+@@ -4193,9 +4192,7 @@
+ 		if (KAL_AIS_NUM > 1) {
+ 			prDevHandler = wlanGetNetDev(prGlueInfo, 1);
+ 			if (prDevHandler) {
+-				kalMemCopy(prDevHandler->dev_addr,
+-					&prAdapter->rWifiVar.aucMacAddress1,
+-					ETH_ALEN);
++				eth_hw_addr_set(prDevHandler, (const u8 *)&prAdapter->rWifiVar.aucMacAddress1);
+ 				kalMemCopy(prDevHandler->perm_addr,
+ 					prDevHandler->dev_addr,
+ 					ETH_ALEN);
+@@ -5324,8 +5321,6 @@
+ 	gConEmiPhyBase = (phys_addr_t)ptr;
+ #endif
+ 
+-	gConEmiPhyBaseFinal = gConEmiPhyBase;
+-	gConEmiSizeFinal = gConEmiSize;
+ 
+ #if (CFG_SUPPORT_CONNINFRA == 1)
+ 	conninfra_get_phy_addr(
+@@ -5333,6 +5328,14 @@
+ 		(unsigned int *)&gConEmiSizeFinal);
+ #endif
+ 
++	{
++		extern int consys_shim_get_emi(phys_addr_t *base, unsigned long long *size);
++
++		if (consys_shim_get_emi(&gConEmiPhyBaseFinal, &gConEmiSizeFinal))
++			return -ENODEV;
++		gConEmiPhyBase = gConEmiPhyBaseFinal;
++		gConEmiSize = gConEmiSizeFinal;
++	}
+ 	DBGLOG(INIT, INFO, "initWlan\n");
+ 
+ #ifdef CFG_DRIVER_INF_NAME_CHANGE
+@@ -5427,6 +5430,12 @@
+ /* 1 Module Leave Point */
+ static void exitWlan(void)
+ {
++	{
++		extern int hifAxiRemove(void);
++
++		/* a full teardown of the adapter (threads, IRQ, WF power) while the netdev/counters are intact */
++		hifAxiRemove();
++	}
+ #if CFG_SUPPORT_PERSIST_NETDEV
+ 	uint32_t u4Idx = 0;
+ 	struct GLUE_INFO *prGlueInfo = NULL;
+diff -ru --strip-trailing-cr '--exclude=*.o' '--exclude=*.ko' '--exclude=*.cmd' '--exclude=*.mod' '--exclude=*.mod.c' '--exclude=Module.symvers' '--exclude=modules.order' '--exclude=build.out' '--exclude=errors.txt' '--exclude=.*.cmd' '--exclude=*.a' a/os/linux/gl_kal.c b/os/linux/gl_kal.c
+--- a/os/linux/gl_kal.c	2026-11-10 23:25:14.390544442 +0100
++++ b/os/linux/gl_kal.c	2026-11-11 11:21:50.495677653 +0100
+@@ -148,6 +148,17 @@
+ u_int8_t wlan_perf_monitor_force_enable = FALSE;
+ #endif
+ 
++#ifndef FB_EVENT_BLANK
++#define FB_EVENT_BLANK 0x09
++#endif
++#ifndef FB_BLANK_UNBLANK
++#define FB_BLANK_UNBLANK 0
++#endif
++#ifndef FB_BLANK_POWERDOWN
++#define FB_BLANK_POWERDOWN 4
++#endif
++#define fb_register_client(nb) (0)
++#define fb_unregister_client(nb) (0)
+ static struct notifier_block wlan_fb_notifier;
+ void *wlan_fb_notifier_priv_data;
+ 
+@@ -747,8 +758,7 @@
+ 
+ 	if (UNEQUAL_MAC_ADDR(prGlueInfo->prDevHandler->dev_addr,
+ 			     pucMacAddr))
+-		memcpy(prGlueInfo->prDevHandler->dev_addr, pucMacAddr,
+-		       PARAM_MAC_ADDR_LEN);
++		eth_hw_addr_set(prGlueInfo->prDevHandler, pucMacAddr);
+ }
+ 
+ #if CFG_TCP_IP_CHKSUM_OFFLOAD
+@@ -1511,7 +1521,7 @@
+ 				aisGetConnSettings(prAdapter, ucBssIndex);
+ 			if (eStatus == WLAN_STATUS_ROAM_OUT_FIND_BEST) {
+ #if KERNEL_VERSION(4, 12, 0) <= CFG80211_VERSION_CODE
+-				rRoamInfo.bss = bss;
++				rRoamInfo.links[0].bss = bss;
+ 				rRoamInfo.req_ie = prConnSettings->aucReqIe;
+ 				rRoamInfo.req_ie_len =
+ 					prConnSettings->u4ReqIeLength;
+@@ -5480,13 +5490,9 @@
+ 			 int createModes)
+ {
+ 	struct file *prFile = NULL;
+-	mm_segment_t oldFs;
+ 	long errval = 0;
+ 
+-	oldFs = get_fs();
+-	set_fs(get_ds());
+ 	prFile = filp_open(filePath, openModes, createModes);
+-	set_fs(oldFs);
+ 	if (IS_ERR(prFile)) {
+ 		errval = PTR_ERR(prFile);
+ 		DBGLOG(INIT, TRACE, "kalFileOpen() fail: %ld\n", errval);
+@@ -5504,11 +5510,8 @@
+ 		     unsigned long long pos, unsigned char *buffer,
+ 		     unsigned int len)
+ {
+-	mm_segment_t oldFs;
+ 	int retval;
+ 
+-	oldFs = get_fs();
+-	set_fs(get_ds());
+ 
+ #if KERNEL_VERSION(4, 13, 0) <= CFG80211_VERSION_CODE
+ 	retval = kernel_read(prFile, buffer, len, &pos);
+@@ -5516,7 +5519,6 @@
+ 	retval = vfs_read(prFile, buffer, len, &pos);
+ #endif
+ 
+-	set_fs(oldFs);
+ 	return retval;
+ }
+ 
+@@ -5524,11 +5526,8 @@
+ 		      unsigned long long pos, unsigned char *buffer,
+ 		      unsigned int len)
+ {
+-	mm_segment_t oldFs;
+ 	int retval;
+ 
+-	oldFs = get_fs();
+-	set_fs(get_ds());
+ 
+ #if KERNEL_VERSION(4, 13, 0) <= CFG80211_VERSION_CODE
+ 	retval = kernel_write(prFile, buffer, len, &pos);
+@@ -5536,7 +5535,6 @@
+ 	retval = vfs_write(prFile, buffer, len, &pos);
+ #endif
+ 
+-	set_fs(oldFs);
+ 	return retval;
+ }
+ 
+@@ -6625,16 +6623,16 @@
+ }
+ 
+ #if 0
+-const struct file_operations rMetProcFops = {
+-	.write = kalMetWriteProcfs
++const struct proc_ops rMetProcFops = {
++	.proc_write = kalMetWriteProcfs
+ };
+ #endif
+-const struct file_operations rMetProcCtrlFops = {
+-	.write = kalMetCtrlWriteProcfs
++const struct proc_ops rMetProcCtrlFops = {
++	.proc_write = kalMetCtrlWriteProcfs
+ };
+ 
+-const struct file_operations rMetProcPortFops = {
+-	.write = kalMetPortWriteProcfs
++const struct proc_ops rMetProcPortFops = {
++	.proc_write = kalMetPortWriteProcfs
+ };
+ 
+ int kalMetInitProcfs(IN struct GLUE_INFO *prGlueInfo)
+@@ -7680,9 +7678,9 @@
+ 		if (ndev) {
+ 			pos += kalSnprintf(pos, end - pos, "[%lu:%lu:%lu:%lu]",
+ 				ndev->stats.tx_dropped,
+-				atomic_long_read(&ndev->tx_dropped),
++				0L,
+ 				ndev->stats.rx_dropped,
+-				atomic_long_read(&ndev->rx_dropped));
++				0L);
+ 		}
+ 	}
+ 
+@@ -7943,61 +7941,8 @@
+ /* mimic store_rps_map as net-sysfs.c does */
+ int wlan_set_rps_map(struct netdev_rx_queue *queue, unsigned long rps_value)
+ {
+-#if KERNEL_VERSION(4, 14, 0) <= CFG80211_VERSION_CODE
+-	struct rps_map *old_map, *map;
+-	cpumask_var_t mask;
+-	int cpu, i;
+-	static DEFINE_MUTEX(rps_map_mutex);
+-
+-	if (!alloc_cpumask_var(&mask, GFP_KERNEL))
+-		return -ENOMEM;
+-
+-	*cpumask_bits(mask) = rps_value;
+-	map = kzalloc(max_t(unsigned int,
+-			RPS_MAP_SIZE(cpumask_weight(mask)), L1_CACHE_BYTES),
+-			GFP_KERNEL);
+-	if (!map) {
+-		free_cpumask_var(mask);
+-		return -ENOMEM;
+-	}
+-
+-	i = 0;
+-	for_each_cpu_and(cpu, mask, cpu_online_mask)
+-		map->cpus[i++] = cpu;
+-
+-	if (i) {
+-		map->len = i;
+-	} else {
+-		kfree(map);
+-		map = NULL;
+-	}
+-
+-	mutex_lock(&rps_map_mutex);
+-	old_map = rcu_dereference_protected(queue->rps_map,
+-				mutex_is_locked(&rps_map_mutex));
+-	rcu_assign_pointer(queue->rps_map, map);
+-	if (map)
+-#if KERNEL_VERSION(5, 4, 0) <= LINUX_VERSION_CODE
+-		static_branch_inc(&rps_needed);
+-#else
+-		static_key_slow_inc(&rps_needed);
+-#endif
+-	if (old_map)
+-#if KERNEL_VERSION(5, 4, 0) <= LINUX_VERSION_CODE
+-		static_branch_dec(&rps_needed);
+-#else
+-		static_key_slow_dec(&rps_needed);
+-#endif
+-	mutex_unlock(&rps_map_mutex);
+-
+-	if (old_map)
+-		kfree_rcu(old_map, rcu);
+-	free_cpumask_var(mask);
+-
+-	return 0;
+-#else
++	/* 6.x: struct rps_map / netdev_rx_queue are not exported to modules — keep the default RPS */
+ 	return 0;
+-#endif
+ }
+ 
+ void kalSetRpsMap(IN struct GLUE_INFO *glue, IN unsigned long value)
+@@ -8008,8 +7953,7 @@
+ 	for (i = 0; i < BSS_DEFAULT_NUM; i++) {
+ 		dev = wlanGetNetDev(glue, i);
+ 		if (dev) {
+-			for (j = 0; j < dev->real_num_rx_queues; ++j)
+-				wlan_set_rps_map(&dev->_rx[j], value);
++			(void)j; /* the RPS map is not available to modules on 6.x */
+ 		}
+ 	}
+ }
+@@ -8141,7 +8085,7 @@
+ 	DBGLOG(REQ, STATE, "DFS channel switch to %d\n", ucChannelNum);
+ 
+ 	cfg80211_chandef_create(&chandef, prChannel, rChannelType);
+-	cfg80211_ch_switch_notify(prGlueInfo->prDevHandler, &chandef);
++	cfg80211_ch_switch_notify(prGlueInfo->prDevHandler, &chandef, 0);
+ }
+ #endif
+ 
+@@ -8759,6 +8703,3 @@
+ 	kalMemFree(buf, VIR_MEM_TYPE, u4BufferSize);
+ }
+ 
+-#if KERNEL_VERSION(5, 4, 0) <= CFG80211_VERSION_CODE
+-MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+-#endif
+diff -ru --strip-trailing-cr '--exclude=*.o' '--exclude=*.ko' '--exclude=*.cmd' '--exclude=*.mod' '--exclude=*.mod.c' '--exclude=Module.symvers' '--exclude=modules.order' '--exclude=build.out' '--exclude=errors.txt' '--exclude=.*.cmd' '--exclude=*.a' a/os/linux/gl_p2p.c b/os/linux/gl_p2p.c
+--- a/os/linux/gl_p2p.c	2026-11-10 23:25:14.404439886 +0100
++++ b/os/linux/gl_p2p.c	2026-11-11 11:21:50.489166885 +0100
+@@ -555,7 +555,7 @@
+ 	spin_lock_init(&prNetDevPrivate->napi_spinlock);
+ 	prNetDevPrivate->napi.dev = prDev;
+ 	netif_napi_add(prNetDevPrivate->napi.dev,
+-		&prNetDevPrivate->napi, p2p_napi_poll, 64);
++		&prNetDevPrivate->napi, p2p_napi_poll);
+ 	DBGLOG(INIT, TRACE,
+ 		"GRO interface added successfully:%p\n", prDev);
+ #endif
+@@ -1342,7 +1342,7 @@
+ 
+ 		DBGLOG(INIT, INFO, "Set p2p role[%d] mac to " MACSTR "\n",
+ 				i, MAC2STR(rMacAddr));
+-		kalMemCopy(prP2pDev->dev_addr, rMacAddr, ETH_ALEN);
++		eth_hw_addr_set(prP2pDev, rMacAddr);
+ 		kalMemCopy(prP2pDev->perm_addr, prP2pDev->dev_addr, ETH_ALEN);
+ 
+ 		if (glSetupP2P(prGlueInfo, prP2pWdev, prP2pDev, i, fgIsApMode)
+@@ -2226,7 +2226,7 @@
+ 	sa = (struct sockaddr *)addr;
+ 
+ 	COPY_MAC_ADDR(prBssInfo->aucOwnMacAddr, sa->sa_data);
+-	COPY_MAC_ADDR(prDev->dev_addr, sa->sa_data);
++	eth_hw_addr_set(prDev, (const u8 *)sa->sa_data);
+ 	COPY_MAC_ADDR(prAdapter->rWifiVar.aucInterfaceAddress[ucRoleIdx],
+ 			sa->sa_data);
+ 
+diff -ru --strip-trailing-cr '--exclude=*.o' '--exclude=*.ko' '--exclude=*.cmd' '--exclude=*.mod' '--exclude=*.mod.c' '--exclude=Module.symvers' '--exclude=modules.order' '--exclude=build.out' '--exclude=errors.txt' '--exclude=.*.cmd' '--exclude=*.a' a/os/linux/gl_p2p_cfg80211.c b/os/linux/gl_p2p_cfg80211.c
+--- a/os/linux/gl_p2p_cfg80211.c	2026-11-10 23:25:14.410544435 +0100
++++ b/os/linux/gl_p2p_cfg80211.c	2026-11-11 11:21:50.489695136 +0100
+@@ -397,7 +397,7 @@
+ 					prGlueInfo->prAdapter
+ 						->prP2pInfo->u4DeviceNum << 2;
+ 		}
+-		kalMemCopy(prNewNetDevice->dev_addr, rMacAddr, ETH_ALEN);
++		eth_hw_addr_set(prNewNetDevice, rMacAddr);
+ 		kalMemCopy(prNewNetDevice->perm_addr, rMacAddr, ETH_ALEN);
+ 
+ 		DBGLOG(P2P, TRACE,
+diff -ru --strip-trailing-cr '--exclude=*.o' '--exclude=*.ko' '--exclude=*.cmd' '--exclude=*.mod' '--exclude=*.mod.c' '--exclude=Module.symvers' '--exclude=modules.order' '--exclude=build.out' '--exclude=errors.txt' '--exclude=.*.cmd' '--exclude=*.a' a/os/linux/gl_p2p_kal.c b/os/linux/gl_p2p_kal.c
+--- a/os/linux/gl_p2p_kal.c	2026-11-10 23:25:14.432389719 +0100
++++ b/os/linux/gl_p2p_kal.c	2026-11-11 11:21:50.490207528 +0100
+@@ -1664,7 +1664,7 @@
+ 		/* cac start disable for next cac slot
+ 		 * if enable in dfs channel
+ 		 */
+-		prGlueInfo->prP2PInfo[ucRoleIndex]->prWdev->cac_started = FALSE;
++		prGlueInfo->prP2PInfo[ucRoleIndex]->prWdev->links[0].cac_started = FALSE;
+ 		DBGLOG(INIT, INFO,
+ 			"kalP2PRddDetectUpdate: Update to OS\n");
+ 		cfg80211_radar_event(
+@@ -1717,11 +1717,11 @@
+ 		cfg80211_cac_event(
+ 			prGlueInfo->prP2PInfo[ucRoleIndex]->prDevHandler,
+ 			prGlueInfo->prP2PInfo[ucRoleIndex]->chandef,
+-			NL80211_RADAR_CAC_FINISHED, GFP_KERNEL);
++			NL80211_RADAR_CAC_FINISHED, GFP_KERNEL, 0);
+ #else
+ 		cfg80211_cac_event(
+ 			prGlueInfo->prP2PInfo[ucRoleIndex]->prDevHandler,
+-			NL80211_RADAR_CAC_FINISHED, GFP_KERNEL);
++			NL80211_RADAR_CAC_FINISHED, GFP_KERNEL, 0);
+ #endif
+ 		DBGLOG(INIT, INFO,
+ 			"kalP2PCacFinishedUpdate: Update to OS Done\n");
+@@ -2339,5 +2339,5 @@
+ 	/* Ch notify */
+ 	cfg80211_ch_switch_notify(
+ 		prP2PInfo->prDevHandler,
+-		prP2PInfo->chandef);
++		prP2PInfo->chandef, 0);
+ }
+diff -ru --strip-trailing-cr '--exclude=*.o' '--exclude=*.ko' '--exclude=*.cmd' '--exclude=*.mod' '--exclude=*.mod.c' '--exclude=Module.symvers' '--exclude=modules.order' '--exclude=build.out' '--exclude=errors.txt' '--exclude=.*.cmd' '--exclude=*.a' a/os/linux/gl_proc.c b/os/linux/gl_proc.c
+--- a/os/linux/gl_proc.c	2026-11-10 23:25:14.441422239 +0100
++++ b/os/linux/gl_proc.c	2026-11-11 11:21:50.480954345 +0100
+@@ -595,33 +595,29 @@
+ 	return count;
+ }
+ 
+-static const struct file_operations dbglevel_ops = {
+-	.owner = THIS_MODULE,
+-	.read = procDbgLevelRead,
+-	.write = procDbgLevelWrite,
++static const struct proc_ops dbglevel_ops = {
++	.proc_read = procDbgLevelRead,
++	.proc_write = procDbgLevelWrite,
+ };
+ 
+ #if WLAN_INCLUDE_PROC
+ #if	CFG_SUPPORT_EASY_DEBUG
+ 
+-static const struct file_operations efusedump_ops = {
+-	.owner = THIS_MODULE,
+-	.open = procEfuseDumpOpen,
+-	.read = seq_read,
+-	.llseek = seq_lseek,
+-	.release = seq_release,
++static const struct proc_ops efusedump_ops = {
++	.proc_open = procEfuseDumpOpen,
++	.proc_read = seq_read,
++	.proc_lseek = seq_lseek,
++	.proc_release = seq_release,
+ };
+ 
+-static const struct file_operations drivercmd_ops = {
+-	.owner = THIS_MODULE,
+-	.read = procDriverCmdRead,
+-	.write = procDriverCmdWrite,
++static const struct proc_ops drivercmd_ops = {
++	.proc_read = procDriverCmdRead,
++	.proc_write = procDriverCmdWrite,
+ };
+ 
+-static const struct file_operations cfg_ops = {
+-	.owner = THIS_MODULE,
+-	.read = procCfgRead,
+-	.write = procCfgWrite,
++static const struct proc_ops cfg_ops = {
++	.proc_read = procCfgRead,
++	.proc_write = procCfgWrite,
+ };
+ #endif
+ #endif
+@@ -757,10 +753,9 @@
+ 
+ }				/* end of procMCRWrite() */
+ 
+-static const struct file_operations mcr_ops = {
+-	.owner = THIS_MODULE,
+-	.read = procMCRRead,
+-	.write = procMCRWrite,
++static const struct proc_ops mcr_ops = {
++	.proc_read = procMCRRead,
++	.proc_write = procMCRWrite,
+ };
+ 
+ #if CFG_SUPPORT_SET_CAM_BY_PROC
+@@ -832,9 +827,8 @@
+ 	return count;
+ }
+ 
+-static const struct file_operations proc_set_cam_ops = {
+-	.owner = THIS_MODULE,
+-	.write = procSetCamCfgWrite,
++static const struct proc_ops proc_set_cam_ops = {
++	.proc_write = procSetCamCfgWrite,
+ };
+ #endif /*CFG_SUPPORT_SET_CAM_BY_PROC */
+ 
+@@ -966,10 +960,9 @@
+ 	return count;
+ }
+ 
+-static const struct file_operations proc_pkt_delay_dbg_ops = {
+-	.owner = THIS_MODULE,
+-	.read = procPktDelayDbgCfgRead,
+-	.write = procPktDelayDbgCfgWrite,
++static const struct proc_ops proc_pkt_delay_dbg_ops = {
++	.proc_read = procPktDelayDbgCfgRead,
++	.proc_write = procPktDelayDbgCfgWrite,
+ };
+ 
+ #if CFG_SUPPORT_DEBUG_FS
+@@ -1038,10 +1031,9 @@
+ 	return count;
+ }
+ 
+-static const struct file_operations roam_ops = {
+-	.owner = THIS_MODULE,
+-	.read = procRoamRead,
+-	.write = procRoamWrite,
++static const struct proc_ops roam_ops = {
++	.proc_read = procRoamRead,
++	.proc_write = procRoamWrite,
+ };
+ #endif
+ 
+@@ -1101,10 +1093,9 @@
+ 	return count;
+ }
+ 
+-static const struct file_operations country_ops = {
+-	.owner = THIS_MODULE,
+-	.read = procCountryRead,
+-	.write = procCountryWrite,
++static const struct proc_ops country_ops = {
++	.proc_read = procCountryRead,
++	.proc_write = procCountryWrite,
+ };
+ 
+ static ssize_t procAutoPerfCfgRead(struct file *filp, char __user *buf,
+@@ -1190,10 +1181,9 @@
+ 	return -EFAULT;
+ }
+ 
+-static const struct file_operations auto_perf_ops = {
+-	.owner = THIS_MODULE,
+-	.read = procAutoPerfCfgRead,
+-	.write = procAutoPerfCfgWrite,
++static const struct proc_ops auto_perf_ops = {
++	.proc_read = procAutoPerfCfgRead,
++	.proc_write = procAutoPerfCfgWrite,
+ };
+ 
+ #if (CFG_SUPPORT_PRE_ON_PHY_ACTION == 1)
+@@ -1260,10 +1250,9 @@
+ 	return count;
+ }
+ 
+-static const struct file_operations cal_result_ops = {
+-	.owner = THIS_MODULE,
+-	.read = procCalResultRead,
+-	.write = procCalResultWrite,
++static const struct proc_ops cal_result_ops = {
++	.proc_read = procCalResultRead,
++	.proc_write = procCalResultWrite,
+ };
+ #endif /*(CFG_SUPPORT_PRE_ON_PHY_ACTION == 1)*/
+ 
+@@ -1804,10 +1793,9 @@
+ 	return count;
+ }
+ 
+-static const struct file_operations fwcfg_ops = {
+-	.owner = THIS_MODULE,
+-	.read = cfgRead,
+-	.write = cfgWrite,
++static const struct proc_ops fwcfg_ops = {
++	.proc_read = cfgRead,
++	.proc_write = cfgWrite,
+ };
+ 
+ int32_t cfgRemoveProcEntry(void)
+diff -ru --strip-trailing-cr '--exclude=*.o' '--exclude=*.ko' '--exclude=*.cmd' '--exclude=*.mod' '--exclude=*.mod.c' '--exclude=Module.symvers' '--exclude=modules.order' '--exclude=build.out' '--exclude=errors.txt' '--exclude=.*.cmd' '--exclude=*.a' a/os/linux/gl_rst.c b/os/linux/gl_rst.c
+--- a/os/linux/gl_rst.c	2026-11-10 23:25:14.450544426 +0100
++++ b/os/linux/gl_rst.c	2026-11-11 11:21:50.509056602 +0100
+@@ -74,6 +74,7 @@
+ #include <linux/workqueue.h>
+ 
+ #include "precomp.h"
++#include "wmt_exp.h"
+ #include "gl_rst.h"
+ 
+ #if (CFG_ANDORID_CONNINFRA_COREDUMP_SUPPORT == 1)
+diff -ru --strip-trailing-cr '--exclude=*.o' '--exclude=*.ko' '--exclude=*.cmd' '--exclude=*.mod' '--exclude=*.mod.c' '--exclude=Module.symvers' '--exclude=modules.order' '--exclude=build.out' '--exclude=errors.txt' '--exclude=.*.cmd' '--exclude=*.a' a/os/linux/hif/axi/axi.c b/os/linux/hif/axi/axi.c
+--- a/os/linux/hif/axi/axi.c	2026-11-10 23:25:14.531009012 +0100
++++ b/os/linux/hif/axi/axi.c	2026-11-11 11:21:50.479472622 +0100
+@@ -99,21 +99,13 @@
+  */
+ 
+ static const struct platform_device_id mtk_axi_ids[] = {
+-	{	.name = "CONNAC",
+ #ifdef CONNAC
+-		.driver_data = (kernel_ulong_t)&mt66xx_driver_data_connac},
+-#endif /* CONNAC */
+-#ifdef CONNAC2X2
+-		.driver_data = (kernel_ulong_t)&mt66xx_driver_data_connac2x2},
+-#endif /* CONNAC2X2 */
+-#ifdef SOC3_0
+-		.driver_data = (kernel_ulong_t)&mt66xx_driver_data_soc3_0},
+-#endif /* SOC3_0 */
+-
++	{ .name = "CONNAC", .driver_data = (kernel_ulong_t)&mt66xx_driver_data_connac },
++#endif
+ 	{ /* end: all zeroes */ },
+ };
+ 
+-MODULE_DEVICE_TABLE(axi, mtk_axi_ids);
++/* MODULE_DEVICE_TABLE(axi, ...) — there is no "axi" bus in the kernel */
+ 
+ #ifdef CONFIG_OF
+ const struct of_device_id mtk_axi_of_ids[] = {
+@@ -528,7 +520,7 @@
+ 	       &grMem.pucRsvMemBase,
+ 	       &grMem.pucRsvMemVirBase);
+ 
+-	kalSetDrvEmiMpuProtection(grMem.pucRsvMemBase, 0, grMem.u4RsvMemSize);
++	/* EMI MPU: mainline has no vendor MPU */
+ 
+ 	for (u4Idx = 0; u4Idx < NUM_OF_TX_RING; u4Idx++) {
+ 		if (!axiAllocRsvMem(TX_RING_SIZE * TXD_SIZE,
+@@ -804,7 +796,7 @@
+ 	return ret;
+ }
+ 
+-static int mtk_axi_remove(IN struct platform_device *pdev)
++static void mtk_axi_remove(IN struct platform_device *pdev)
+ {
+ 	axiCsrIounmap(pdev);
+ 
+@@ -822,7 +814,6 @@
+ 	hifAxiRemove();
+ #endif
+ 	platform_set_drvdata(pdev, NULL);
+-	return 0;
+ }
+ 
+ static int mtk_axi_suspend(IN struct platform_device *pdev,
+diff -ru --strip-trailing-cr '--exclude=*.o' '--exclude=*.ko' '--exclude=*.cmd' '--exclude=*.mod' '--exclude=*.mod.c' '--exclude=Module.symvers' '--exclude=modules.order' '--exclude=build.out' '--exclude=errors.txt' '--exclude=.*.cmd' '--exclude=*.a' a/os/linux/hif/common/kal_pdma.c b/os/linux/hif/common/kal_pdma.c
+--- a/os/linux/hif/common/kal_pdma.c	2026-11-10 23:25:14.595260044 +0100
++++ b/os/linux/hif/common/kal_pdma.c	2026-11-11 11:21:50.479698581 +0100
+@@ -739,9 +739,11 @@
+ 	return fgRet;
+ }
+ 
+-static int kalAmsduTxDCmp(void *prPriv, struct list_head *prList1,
+-			  struct list_head *prList2)
++static int kalAmsduTxDCmp(void *prPriv, const struct list_head *prList1c,
++			  const struct list_head *prList2c)
+ {
++	struct list_head *prList1 = (struct list_head *)prList1c;
++	struct list_head *prList2 = (struct list_head *)prList2c;
+ 	struct TX_DATA_REQ *prTxReq1, *prTxReq2;
+ 	struct sk_buff *prSkb1, *prSkb2;
+ 	struct AMSDU_MAC_TX_DESC *prTxD1, *prTxD2;
+diff -ru --strip-trailing-cr '--exclude=*.o' '--exclude=*.ko' '--exclude=*.cmd' '--exclude=*.mod' '--exclude=*.mod.c' '--exclude=Module.symvers' '--exclude=modules.order' '--exclude=build.out' '--exclude=errors.txt' '--exclude=.*.cmd' '--exclude=*.a' a/os/linux/include/gl_cfg80211.h b/os/linux/include/gl_cfg80211.h
+--- a/os/linux/include/gl_cfg80211.h	2026-11-10 23:25:14.823796356 +0100
++++ b/os/linux/include/gl_cfg80211.h	2026-11-11 11:21:50.493971055 +0100
+@@ -517,22 +517,23 @@
+ 			 struct vif_params *params);
+ #endif
+ int mtk_cfg_add_key(struct wiphy *wiphy,
+-		    struct net_device *ndev, u8 key_index,
++		    struct net_device *ndev, int link_id, u8 key_index,
+ 		    bool pairwise, const u8 *mac_addr,
+ 		    struct key_params *params);
+ int mtk_cfg_get_key(struct wiphy *wiphy,
+-		    struct net_device *ndev, u8 key_index,
++		    struct net_device *ndev, int link_id, u8 key_index,
+ 		    bool pairwise, const u8 *mac_addr, void *cookie,
+ 		    void (*callback)(void *cookie, struct key_params *));
+ int mtk_cfg_del_key(struct wiphy *wiphy,
+-		    struct net_device *ndev, u8 key_index,
++		    struct net_device *ndev, int link_id, u8 key_index,
+ 		    bool pairwise, const u8 *mac_addr);
+ int mtk_cfg_set_default_key(struct wiphy *wiphy,
+ 			    struct net_device *ndev,
++			    int link_id,
+ 			    u8 key_index, bool unicast, bool multicast);
+ 
+ int mtk_cfg_set_default_mgmt_key(struct wiphy *wiphy,
+-		struct net_device *ndev, u8 key_index);
++		struct net_device *ndev, int link_id, u8 key_index);
+ 
+ #if KERNEL_VERSION(3, 16, 0) <= CFG80211_VERSION_CODE
+ int mtk_cfg_get_station(struct wiphy *wiphy,
+@@ -575,20 +576,20 @@
+ #if KERNEL_VERSION(3, 18, 0) <= CFG80211_VERSION_CODE
+ int mtk_cfg_tdls_mgmt(struct wiphy *wiphy,
+ 		      struct net_device *ndev,
+-		      const u8 *peer, u8 action_code, u8 dialog_token,
++		      const u8 *peer, int link_id, u8 action_code, u8 dialog_token,
+ 		      u16 status_code,
+ 		      u32 peer_capability, bool initiator, const u8 *buf,
+ 		      size_t len);
+ #elif KERNEL_VERSION(3, 16, 0) <= CFG80211_VERSION_CODE
+ int mtk_cfg_tdls_mgmt(struct wiphy *wiphy,
+ 		      struct net_device *ndev,
+-		      const u8 *peer, u8 action_code, u8 dialog_token,
++		      const u8 *peer, int link_id, u8 action_code, u8 dialog_token,
+ 		      u16 status_code,
+ 		      u32 peer_capability, const u8 *buf, size_t len);
+ #else
+ int mtk_cfg_tdls_mgmt(struct wiphy *wiphy,
+ 		      struct net_device *ndev,
+-		      u8 *peer, u8 action_code,
++		      u8 *peer, int link_id, u8 action_code,
+ 		      u8 dialog_token, u16 status_code,
+ 		      const u8 *buf, size_t len);
+ #endif
+@@ -690,6 +691,8 @@
+ void mtk_cfg_mgmt_frame_register(struct wiphy *wiphy,
+ 				 struct wireless_dev *wdev,
+ 				 u16 frame_type, bool reg);
++void mtk_cfg_update_mgmt_frame_registrations(struct wiphy *wiphy, struct wireless_dev *wdev,
++					     struct mgmt_frame_regs *upd);
+ 
+ #ifdef CONFIG_NL80211_TESTMODE
+ #if KERNEL_VERSION(3, 12, 0) <= CFG80211_VERSION_CODE
+@@ -707,7 +710,7 @@
+ int mtk_cfg_start_radar_detection(struct wiphy *wiphy,
+ 				  struct net_device *dev,
+ 				  struct cfg80211_chan_def *chandef,
+-				  unsigned int cac_time_ms);
++				  unsigned int cac_time_ms, int link_id);
+ #else
+ int mtk_cfg_start_radar_detection(struct wiphy *wiphy,
+ 				  struct net_device *dev,
+@@ -741,13 +744,14 @@
+ 		     struct cfg80211_ap_settings *settings);
+ int mtk_cfg_change_beacon(struct wiphy *wiphy,
+ 			  struct net_device *dev,
+-			  struct cfg80211_beacon_data *info);
++			  struct cfg80211_ap_update *ap_update);
+ int mtk_cfg_stop_ap(struct wiphy *wiphy,
+-		    struct net_device *dev);
++		    struct net_device *dev, unsigned int link_id);
+ int mtk_cfg_set_wiphy_params(struct wiphy *wiphy,
+ 			     u32 changed);
+ int mtk_cfg_set_bitrate_mask(struct wiphy *wiphy,
+ 			     struct net_device *dev,
++			     unsigned int link_id,
+ 			     const u8 *peer,
+ 			     const struct cfg80211_bitrate_mask *mask);
+ int mtk_cfg_set_txpower(struct wiphy *wiphy,
+@@ -755,6 +759,7 @@
+ 			enum nl80211_tx_power_setting type, int mbm);
+ int mtk_cfg_get_txpower(struct wiphy *wiphy,
+ 			struct wireless_dev *wdev,
++			unsigned int link_id,
+ 			int *dbm);
+ #endif /* (CFG_ENABLE_WIFI_DIRECT_CFG_80211 != 0) */
+ 
+diff -ru --strip-trailing-cr '--exclude=*.o' '--exclude=*.ko' '--exclude=*.cmd' '--exclude=*.mod' '--exclude=*.mod.c' '--exclude=Module.symvers' '--exclude=modules.order' '--exclude=build.out' '--exclude=errors.txt' '--exclude=.*.cmd' '--exclude=*.a' a/os/linux/plat/mt6785/plat_priv.c b/os/linux/plat/mt6785/plat_priv.c
+--- a/os/linux/plat/mt6785/plat_priv.c	2026-11-10 23:25:14.915854298 +0100
++++ b/os/linux/plat/mt6785/plat_priv.c	2026-11-11 11:21:50.510553842 +0100
+@@ -1,126 +1,27 @@
+-/*
+-* This program is free software; you can redistribute it and/or modify
+-* it under the terms of the GNU General Public License version 2 as
+-* published by the Free Software Foundation.
+-*
+-* This program is distributed in the hope that it will be useful,
+-* but WITHOUT ANY WARRANTY; without even the implied warranty of
+-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+-* See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+-*/
+-
+-#include <cpu_ctrl.h>
+-#include <topo_ctrl.h>
+-#ifdef WLAN_FORCE_DDR_OPP
+-#include <linux/pm_qos.h>
+-#endif
+-
++// SPDX-License-Identifier: GPL-2.0
++/* mt6785 platform glue for mainline (begonia): vendor CPU-boost/EMI-MPU are not available -> stubs. */
+ #include "precomp.h"
+ 
+-#ifdef CONFIG_MTK_EMI
+-#include <mt_emi_api.h>
+-#define WIFI_EMI_MEM_OFFSET    0x140000
+-#define WIFI_EMI_MEM_SIZE      0x130000
+-#endif
+-
+-
+-#define MAX_CPU_FREQ (3 * 1024 * 1024) /* in kHZ */
+-#define MAX_CLUSTER_NUM  3
+-
+-
+ uint32_t kalGetCpuBoostThreshold(void)
+ {
+-	DBGLOG(SW4, TRACE, "enter kalGetCpuBoostThreshold\n");
+-	/*  3, stands for 100Mbps */
+ 	return 3;
+ }
+ 
+-int32_t kalBoostCpu(IN struct ADAPTER *prAdapter,
+-		    IN uint32_t u4TarPerfLevel,
+-		    IN uint32_t u4BoostCpuTh)
++int32_t kalBoostCpu(IN struct ADAPTER *prAdapter, IN uint32_t u4TarPerfLevel, IN uint32_t u4BoostCpuTh)
+ {
+-	struct ppm_limit_data freq_to_set[MAX_CLUSTER_NUM];
+-	int32_t i = 0, i4Freq = -1;
+-#ifdef WLAN_FORCE_DDR_OPP
+-	static struct pm_qos_request wifi_qos_request;
+-	static u_int8_t fgRequested;
+-#endif
+-	uint32_t u4ClusterNum = topo_ctrl_get_nr_clusters();
+-
+-	ASSERT(u4ClusterNum <= MAX_CLUSTER_NUM);
+-	/* ACAO, we dont have to set core number */
+-	i4Freq = (u4TarPerfLevel >= u4BoostCpuTh) ? MAX_CPU_FREQ : -1;
+-	for (i = 0; i < u4ClusterNum; i++) {
+-		freq_to_set[i].min = i4Freq;
+-		freq_to_set[i].max = i4Freq;
+-	}
+-
+-	update_userlimit_cpu_freq(CPU_KIR_WIFI, u4ClusterNum, freq_to_set);
+-
+-#ifdef WLAN_FORCE_DDR_OPP
+-	if (u4TarPerfLevel >= u4BoostCpuTh) {
+-		if (!fgRequested) {
+-			fgRequested = 1;
+-			pm_qos_add_request(&wifi_qos_request,
+-					   PM_QOS_DDR_OPP,
+-					   DDR_OPP_0);
+-		}
+-		pm_qos_update_request(&wifi_qos_request, DDR_OPP_0);
+-	} else if (fgRequested) {
+-		pm_qos_update_request(&wifi_qos_request, DDR_OPP_UNREQ);
+-		pm_qos_remove_request(&wifi_qos_request);
+-		fgRequested = 0;
+-	}
+-#endif
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_MTK_EMI
+-void kalSetEmiMpuProtection(phys_addr_t emiPhyBase, bool enable)
++int32_t kalGetFwFlavor(uint8_t *flavor)
+ {
+-	struct emi_region_info_t region_info;
+-
+-	DBGLOG(INIT, INFO, "emiPhyBase: 0x%x, enable: %d\n",
+-			emiPhyBase, enable);
+-
+-	/*set MPU for EMI share Memory */
+-	region_info.start = emiPhyBase + WIFI_EMI_MEM_OFFSET;
+-	region_info.end = emiPhyBase + WIFI_EMI_MEM_OFFSET
+-		+ WIFI_EMI_MEM_SIZE - 1;
+-	region_info.region = 26;
+-
+-	SET_ACCESS_PERMISSION(region_info.apc, enable ? LOCK : UNLOCK,
+-			      FORBIDDEN, FORBIDDEN,
+-			      FORBIDDEN, FORBIDDEN, FORBIDDEN, FORBIDDEN,
+-			      FORBIDDEN, FORBIDDEN, FORBIDDEN, FORBIDDEN,
+-			      FORBIDDEN, FORBIDDEN, FORBIDDEN, NO_PROTECTION,
+-			      FORBIDDEN, enable ? FORBIDDEN : NO_PROTECTION);
+-	emi_mpu_set_protection(&region_info);
++	*flavor = 'a';	/* WIFI_RAM_CODE_soc1_0_2a_1.bin */
++	return 1;
+ }
+ 
+-void kalSetDrvEmiMpuProtection(phys_addr_t emiPhyBase, uint32_t offset,
+-			       uint32_t size)
++void kalSetEmiMpuProtection(phys_addr_t emiPhyBase, bool enable)
+ {
+-	struct emi_region_info_t region_info;
+-
+-	DBGLOG(INIT, INFO, "emiPhyBase: 0x%x, offset: %u, size: %u\n",
+-			emiPhyBase, offset, size);
+-
+-	/*set MPU for EMI share Memory */
+-	region_info.start = emiPhyBase + offset;
+-	region_info.end = emiPhyBase + offset + size - 1;
+-	region_info.region = 18;
+-	SET_ACCESS_PERMISSION(region_info.apc, LOCK, FORBIDDEN, FORBIDDEN,
+-			      FORBIDDEN, FORBIDDEN, FORBIDDEN, FORBIDDEN,
+-			      FORBIDDEN, FORBIDDEN, FORBIDDEN, FORBIDDEN,
+-			      FORBIDDEN, FORBIDDEN, FORBIDDEN, NO_PROTECTION,
+-			      FORBIDDEN, NO_PROTECTION);
+-	emi_mpu_set_protection(&region_info);
+ }
+-#endif
+ 
+-int32_t kalGetFwFlavor(uint8_t *flavor)
++void kalSetDrvEmiMpuProtection(phys_addr_t emiPhyBase, uint32_t offset, uint32_t size)
+ {
+-	*flavor = 'a';
+-	return 1;
+ }

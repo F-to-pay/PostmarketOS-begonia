@@ -1,0 +1,13 @@
+[Unit]
+Description=Begonia MT6785 audio (AFE + MT6359), out-of-tree modules
+After=local-fs.target systemd-modules-load.service begonia-wifi.service
+ConditionPathExists=/home/user/Begonia/wifi/audio/audio-up.sh
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh /home/user/Begonia/wifi/audio/audio-up.sh
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target

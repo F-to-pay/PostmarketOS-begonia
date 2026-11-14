@@ -1,0 +1,87 @@
+diff --git a/drivers/input/touchscreen/novatek-nvt-ts-core.c b/drivers/input/touchscreen/novatek-nvt-ts-core.c
+--- a/drivers/input/touchscreen/novatek-nvt-ts-core.c
++++ b/drivers/input/touchscreen/novatek-nvt-ts-core.c
+@@ -15,6 +15,8 @@
+ 
+ #include "novatek-nvt-ts.h"
+ 
++#define NVT_TS_PROBE_RETRIES	5
++
+ static const int nvt_ts_irq_type[4] = {
+ 	IRQF_TRIGGER_RISING,
+ 	IRQF_TRIGGER_FALLING,
+@@ -215,7 +217,8 @@
+ 		 const struct input_id *id,
+ 		 nvt_ts_upload_firmware_impl upload_firmware)
+ {
+-	int error, width, height, irq_type;
++	int error, width, height, irq_type, retry;
++	unsigned long irq_flags;
+ 	struct nvt_ts_data *data;
+ 	const struct nvt_ts_chip_data *chip;
+ 	struct input_dev *input;
+@@ -265,17 +268,34 @@
+ 		return dev_err_probe(dev, error, "failed to request reset GPIO\n");
+ 	}
+ 
+-	error = nvt_ts_upload_firmware(data);
+-	if (error) {
++	/*
++	 * The controller may not be ready yet when its supply was only just
++	 * enabled (early boot), so retry the upload + params read a few times,
++	 * resetting the controller in between.
++	 */
++	for (retry = 0; retry < NVT_TS_PROBE_RETRIES; retry++) {
++		error = nvt_ts_upload_firmware(data);
++		if (!error) {
++			/* Wait for controller to come out of reset before params read */
++			msleep(100);
++			/*
++			 * Read the parameters relative to the event buffer, like downstream
++			 * does: this selects the event buffer page, which the touch event
++			 * reads in nvt_ts_irq() rely on (they use no page select of their own).
++			 */
++			error = regmap_raw_read(data->regmap,
++						data->memory_map->event_buffer | NVT_TS_PARAMETERS_START,
++						data->buf, NVT_TS_PARAMS_SIZE);
++			if (!error)
++				break;
++		}
++
++		dev_dbg(dev, "params not available (%d), retry %d\n", error, retry);
+ 		gpiod_set_value_cansleep(data->reset_gpio, 1);
+-		regulator_bulk_disable(ARRAY_SIZE(data->regulators), data->regulators);
+-		return dev_err_probe(dev, error, "failed to upload firmware\n");
++		msleep(100);
++		gpiod_set_value_cansleep(data->reset_gpio, 0);
++		msleep(10);
+ 	}
+-
+-	/* Wait for controller to come out of reset before params read */
+-	msleep(100);
+-	error = regmap_raw_read(data->regmap, NVT_TS_PARAMETERS_START,
+-				data->buf, NVT_TS_PARAMS_SIZE);
+ 	gpiod_set_value_cansleep(data->reset_gpio, 1); /* Put back in reset */
+ 	regulator_bulk_disable(ARRAY_SIZE(data->regulators), data->regulators);
+ 	if (error)
+@@ -321,9 +341,18 @@
+ 	data->input = input;
+ 	input_set_drvdata(input, data);
+ 
++	/*
++	 * The IRQ trigger type from the firmware parameters is not reliable,
++	 * e.g. the Redmi Note 8 Pro reports "falling" but the interrupt line is
++	 * wired (and described) as rising edge, which is also what the
++	 * downstream driver uses. Prefer the trigger type from firmware/DT.
++	 */
++	irq_flags = irq_get_trigger_type(irq);
++	if (!irq_flags)
++		irq_flags = nvt_ts_irq_type[irq_type];
++
+ 	error = devm_request_threaded_irq(dev, irq, NULL, nvt_ts_irq,
+-					  IRQF_ONESHOT | IRQF_NO_AUTOEN |
+-						nvt_ts_irq_type[irq_type],
++					  IRQF_ONESHOT | IRQF_NO_AUTOEN | irq_flags,
+ 					  dev_name(dev), data);
+ 	if (error)
+ 		return dev_err_probe(dev, error, "failed to request irq\n");

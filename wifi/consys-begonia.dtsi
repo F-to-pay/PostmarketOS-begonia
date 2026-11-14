@@ -1,0 +1,45 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * EXPERIMENTAL: CONSYS bring-up node for Xiaomi Redmi Note 8 Pro (begonia).
+ *
+ * Included at the end of arch/arm64/boot/dts/mediatek/mt6785-xiaomi-begonia.dts:
+ *     #include "consys-begonia.dtsi"
+ *
+ * The values (reg map, memory) are taken from the vendor DT (mt6785.dts: consys@18002000,
+ * consys-reserve-memory) - see NOTES.md. The node is deliberately not connected to an IRQ:
+ * at this stage only the chip id is needed.
+ */
+
+/ {
+	reserved-memory {
+		/* vendor: consys-reserve-memory, 4M, align 16M, 0x40000000..0xC0000000 */
+		consys_emi: consys-emi {
+			no-map;
+			size = <0 0x400000>;
+			alignment = <0 0x1000000>;
+			alloc-ranges = <0 0x40000000 0 0x80000000>;
+		};
+	};
+};
+
+&{/soc} {
+	consys: consys@18002000 {
+		compatible = "xiaomi,begonia-consys-bringup";
+		reg = <0 0x18002000 0 0x1000>,	/* CONN_MCU_CONFIG_BASE */
+		      <0 0x180b1000 0 0x1000>;	/* CONN_TOP_MISC_OFF_BASE */
+		reg-names = "mcu_cfg", "top_misc_off";
+
+		power-domains = <&spm MT6785_POWER_DOMAIN_CONN>;
+		clocks = <&infracfg CLK_INFRA_CCIF4_AP>;
+		clock-names = "ccif4";
+
+		vcn18-supply = <&mt6359_vcn18_ldo_reg>;
+		vcn33_1_wifi-supply = <&mt6359_vcn33_1_wifi_ldo_reg>;
+		vcn33_2_wifi-supply = <&mt6359_vcn33_2_wifi_ldo_reg>;
+
+		mediatek,pericfg = <&pericfg>;
+		mediatek,topckgen = <&topckgen>;
+		mediatek,pwrap = <&pwrap>;
+		memory-region = <&consys_emi>;
+	};
+};

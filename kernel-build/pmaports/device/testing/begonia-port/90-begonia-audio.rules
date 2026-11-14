@@ -1,0 +1,2 @@
+# PulseAudio profile set for the MT6785 + MT6359 card (headphones/speaker ports, AIN0 mic)
+SUBSYSTEM=="sound", KERNEL=="card*", ATTR{id}=="mt6785mt6359", ENV{PULSE_PROFILE_SET}="/usr/share/begonia/pulse/mt6785-mt6359.conf"

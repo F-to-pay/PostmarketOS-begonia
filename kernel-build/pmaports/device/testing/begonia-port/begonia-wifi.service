@@ -1,0 +1,13 @@
+[Unit]
+Description=Begonia CONNSYS WiFi + Bluetooth (in-kernel consys_bringup + wlan_6785_axi)
+After=local-fs.target systemd-modules-load.service
+Before=NetworkManager.service bluetooth.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/begonia/begonia-wifi
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target

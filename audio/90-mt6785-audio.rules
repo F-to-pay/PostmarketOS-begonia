@@ -1,0 +1,1 @@
+SUBSYSTEM=="sound", KERNEL=="card*", ATTR{id}=="mt6785mt6359", ENV{PULSE_PROFILE_SET}="/home/user/Begonia/wifi/audio/mt6785-mt6359.conf"

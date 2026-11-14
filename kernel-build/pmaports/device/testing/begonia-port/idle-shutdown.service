@@ -1,0 +1,9 @@
+[Unit]
+Description=Poweroff after 1h of inactivity
+
+[Service]
+ExecStart=/usr/bin/idle-shutdown.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,21 @@
+--- tp_lockdown_info
+0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+--- nvt_xiaomi_config_info
+FW version/Config version, Debug version: 0x20
+FAE ID: 0x59
+Reservation byte: 0xFFA108A7E280
+--- mt6360 ldo dts
+interrupt-names
+interrupt-parent
+interrupts
+ldo1
+ldo2
+ldo3
+ldo5
+name
+phandle
+status
+ldo1: VFP always-on=n default-on=n 
+ldo2: vtp always-on=y default-on=y 
+ldo3: VMC always-on=n default-on=n 
+ldo5: VMCH always-on=n default-on=n 

@@ -1,0 +1,54 @@
+From 1829a9d25a7a17849fa704e6f70dce483f4794de Mon Sep 17 00:00:00 2001
+From: Begonia <begonia@localhost>
+Date: Thu, 12 Nov 2026 14:28:27 +0100
+Subject: [PATCH 03/18] arm64: dts: mediatek: mt6785-xiaomi-begonia: Power the
+ touchscreen and fix proximity level
+
+The touch controller is supplied by the MT6360 "vtp" LDO, which the
+bootloader leaves on at 3.0 V but nobody requested on mainline: describe it
+as always-on 3.0 V and reference it (and the 1.8 V IO supply) from the
+touchscreen node. The proximity near level of 70 never triggers with the
+STK3310 on this device, use 550.
+---
+ .../boot/dts/mediatek/mt6785-xiaomi-begonia.dts     | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/mediatek/mt6785-xiaomi-begonia.dts b/arch/arm64/boot/dts/mediatek/mt6785-xiaomi-begonia.dts
+index 99f0f47a8..4338ef853 100755
+--- a/arch/arm64/boot/dts/mediatek/mt6785-xiaomi-begonia.dts
++++ b/arch/arm64/boot/dts/mediatek/mt6785-xiaomi-begonia.dts
+@@ -58,7 +58,7 @@ proximity@47 {
+ 			reg = <0x47>;
+ 
+ 			interrupts-extended = <&pio 6 IRQ_TYPE_EDGE_FALLING>;
+-			proximity-near-level = <70>;
++			proximity-near-level = <550>;
+ 
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&proximity_pins>;
+@@ -330,10 +330,12 @@ ldo1 {
+ 							   MT6360_OPMODE_LP>;
+ 			};
+ 
+-			ldo2 {
++			mt6360_vtp_ldo_reg: ldo2 {
+ 				regulator-name = "vtp";
+-				regulator-min-microvolt = <1200000>;
+-				regulator-max-microvolt = <3600000>;
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-always-on;
++				regulator-boot-on;
+ 				regulator-allowed-modes = <MT6360_OPMODE_NORMAL
+ 							   MT6360_OPMODE_LP>;
+ 			};
+@@ -693,6 +695,9 @@ touchscreen@0 {
+ 		spi-cs-setup-delay-ns = <20>;
+ 		spi-max-frequency = <5000000>;
+ 
++		vcc-supply = <&mt6360_vtp_ldo_reg>;
++		iovcc-supply = <&mt6359_vio18_ldo_reg>;
++
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&touchscreen_pins>;
+ 	};

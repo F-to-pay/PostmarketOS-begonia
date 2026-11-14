@@ -1,0 +1,245 @@
+<!-- MHonArc v2.6.19 -->
+<!--X-Subject: [PATCH v8 5/5] arm64: dts: mediatek: mt8365: Add support for camera -->
+<!--X-From-R13: Xhyvra Egrcuna &#60;wfgrcunaNonlyvoer.pbz> -->
+<!--X-Date: Wed, 22 Jan 2025 09:00:12 &#45;0500 (EST) -->
+<!--X-Message-Id: 20250122&#45;add&#45;mtk&#45;isp&#45;3&#45;0&#45;support&#45;v8&#45;5&#45;a3d3731eef45@baylibre.com -->
+<!--X-Content-Type: text/plain -->
+<!--X-Reference: 20250122&#45;add&#45;mtk&#45;isp&#45;3&#45;0&#45;support&#45;v8&#45;0&#45;a3d3731eef45@baylibre.com -->
+<!--X-Head-End-->
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+                      "http://www.w3.org/TR/REC-html40/loose.dtd">
+<html lang=en>
+<head>
+<meta HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-2">
+<title>Linux-Kernel Archive: [PATCH v8 5/5] arm64: dts: mediatek: mt8365: Add support for camera</title>
+<meta NAME="Author" CONTENT="Julien Stephan &lt;jstephan@xxxxxxxxxxxx&gt;">
+<meta NAME="Subject" CONTENT="[PATCH v8 5/5] arm64: dts: mediatek: mt8365: Add support for camera">
+</head> 
+<body BGCOLOR="#FFFFFF" TEXT="#000000">
+
+<!--X-Body-Begin-->
+<!--X-User-Header-->
+<!--X-User-Header-End-->
+<!--X-TopPNI-->
+
+
+<!--X-TopPNI-End-->
+<!--X-MsgBody-->
+<!--X-Subject-Header-Begin-->
+<h1>[PATCH v8 5/5] arm64: dts: mediatek: mt8365: Add support for camera</h1>
+<strong>From: </strong>Julien Stephan
+<br><strong>Date: </strong> Wed Jan 22 2025 - 09:00:12 EST
+<p>
+<ul>
+<li><strong>Next message: </strong> <a href="06546.html"> Julien Stephan: "[PATCH v8 4/5] media: platform: mediatek: isp: add mediatek ISP3.0 camsv"</a>
+
+<li><strong>Previous message: </strong> <a href="06544.html"> Julien Stephan: "[PATCH v8 2/5] dt-bindings: media: add mediatek ISP3.0 camsv"</a>
+
+<li><strong>In reply to: </strong> <a href="06544.html"> Julien Stephan: "[PATCH v8 2/5] dt-bindings: media: add mediatek ISP3.0 camsv"</a>
+
+<li><strong>Next in thread: </strong> <a href="06546.html"> Julien Stephan: "[PATCH v8 4/5] media: platform: mediatek: isp: add mediatek ISP3.0 camsv"</a>
+
+<li><strong>Messages sorted by: </strong><a href="date.html#06545">[ date ]</a> <a href="index.html#06545">[ thread ]</a> <a href="subject.html#06545">[ subject ]</a> <a href="author.html#06545">[ author ]</a>
+</ul>
+
+<!--X-Subject-Header-End-->
+<!--X-Head-of-Message-->
+<!--X-Head-of-Message-End-->
+<!--X-Head-Body-Sep-Begin-->
+<hr NOSHADE>
+<!--X-Head-Body-Sep-End-->
+<!--X-Body-of-Message-->
+Add base support for cameras for mt8365 platforms. This requires nodes<br>
+for the sensor interface, camsv, and CSI receivers.<br>
+<br>
+Reviewed-by: Laurent Pinchart &lt;laurent.pinchart@xxxxxxxxxxxxxxxx&gt;<br>
+Signed-off-by: Julien Stephan &lt;jstephan@xxxxxxxxxxxx&gt;<br>
+---<br>
+ arch/arm64/boot/dts/mediatek/mt8365.dtsi | 125 +++++++++++++++++++++++++++++++<br>
+ 1 file changed, 125 insertions(+)<br>
+<br>
+diff --git a/arch/arm64/boot/dts/mediatek/mt8365.dtsi b/arch/arm64/boot/dts/mediatek/mt8365.dtsi<br>
+index 9c91fe8ea0f969770a611f90b593683f93ff3e22..f3aae8d76cbece5779fe0b23139d594c0ea52579 100644<br>
+--- a/arch/arm64/boot/dts/mediatek/mt8365.dtsi<br>
++++ b/arch/arm64/boot/dts/mediatek/mt8365.dtsi<br>
+@@ -12,6 +12,7 @@<br>
+ #include &lt;dt-bindings/interrupt-controller/irq.h&gt;<br>
+ #include &lt;dt-bindings/phy/phy.h&gt;<br>
+ #include &lt;dt-bindings/power/mediatek,mt8365-power.h&gt;<br>
++#include &lt;dt-bindings/memory/mediatek,mt8365-larb-port.h&gt;<br>
+ <br>
+ / {<br>
+ 	compatible = &quot;mediatek,mt8365&quot;;<br>
+@@ -704,6 +705,23 @@ ethernet: ethernet@112a0000 {<br>
+ 			status = &quot;disabled&quot;;<br>
+ 		};<br>
+ <br>
++		mipi_csi0: mipi-csi0@11c10000 {<br>
++			compatible = &quot;mediatek,mt8365-csi-rx&quot;;<br>
++			reg = &lt;0 0x11c10000 0 0x2000&gt;;<br>
++			status = &quot;disabled&quot;;<br>
++			num-lanes = &lt;4&gt;;<br>
++			#phy-cells = &lt;1&gt;;<br>
++		};<br>
++<br>
++		mipi_csi1: mipi-csi1@11c12000 {<br>
++			compatible = &quot;mediatek,mt8365-csi-rx&quot;;<br>
++			reg = &lt;0 0x11c12000 0 0x2000&gt;;<br>
++			phy-type = &lt;PHY_TYPE_DPHY&gt;;<br>
++			status = &quot;disabled&quot;;<br>
++			num-lanes = &lt;4&gt;;<br>
++			#phy-cells = &lt;0&gt;;<br>
++		};<br>
++<br>
+ 		u3phy: t-phy@11cc0000 {<br>
+ 			compatible = &quot;mediatek,mt8365-tphy&quot;, &quot;mediatek,generic-tphy-v2&quot;;<br>
+ 			#address-cells = &lt;1&gt;;<br>
+@@ -774,6 +792,113 @@ larb2: larb@15001000 {<br>
+ 			mediatek,larb-id = &lt;2&gt;;<br>
+ 		};<br>
+ <br>
++		seninf: seninf@15040000 {<br>
++			compatible = &quot;mediatek,mt8365-seninf&quot;;<br>
++			reg = &lt;0 0x15040000 0 0x6000&gt;;<br>
++			interrupts = &lt;GIC_SPI 210 IRQ_TYPE_LEVEL_LOW&gt;;<br>
++			clocks = &lt;&amp;camsys CLK_CAM_SENIF&gt;,<br>
++				 &lt;&amp;topckgen CLK_TOP_SENIF_SEL&gt;;<br>
++			clock-names = &quot;camsys&quot;, &quot;top_mux&quot;;<br>
++<br>
++			power-domains = &lt;&amp;spm MT8365_POWER_DOMAIN_CAM&gt;;<br>
++<br>
++			phys = &lt;&amp;mipi_csi0 PHY_TYPE_DPHY&gt;, &lt;&amp;mipi_csi1&gt;;<br>
++			phy-names = &quot;csi0&quot;, &quot;csi1&quot;;<br>
++<br>
++			status = &quot;disabled&quot;;<br>
++<br>
++			ports {<br>
++				#address-cells = &lt;1&gt;;<br>
++				#size-cells = &lt;0&gt;;<br>
++<br>
++				port@0 {<br>
++					reg = &lt;0&gt;;<br>
++				};<br>
++<br>
++				port@1 {<br>
++					reg = &lt;1&gt;;<br>
++				};<br>
++<br>
++				port@2 {<br>
++					reg = &lt;2&gt;;<br>
++				};<br>
++<br>
++				port@3 {<br>
++					reg = &lt;3&gt;;<br>
++				};<br>
++<br>
++				port@4 {<br>
++					reg = &lt;4&gt;;<br>
++					seninf_camsv1_endpoint: endpoint {<br>
++						remote-endpoint =<br>
++							&lt;&amp;camsv1_endpoint&gt;;<br>
++					};<br>
++				};<br>
++<br>
++				port@5 {<br>
++					reg = &lt;5&gt;;<br>
++					seninf_camsv2_endpoint: endpoint {<br>
++						remote-endpoint =<br>
++							&lt;&amp;camsv2_endpoint&gt;;<br>
++					};<br>
++				};<br>
++			};<br>
++		};<br>
++<br>
++		camsv1: camsv@15050000 {<br>
++			compatible = &quot;mediatek,mt8365-camsv&quot;;<br>
++			reg = &lt;0 0x15050000 0 0x0040&gt;,<br>
++			      &lt;0 0x15050208 0 0x0020&gt;,<br>
++			      &lt;0 0x15050400 0 0x0100&gt;;<br>
++			interrupts = &lt;GIC_SPI 186 IRQ_TYPE_LEVEL_LOW&gt;;<br>
++			clocks = &lt;&amp;camsys CLK_CAM&gt;,<br>
++				 &lt;&amp;camsys CLK_CAMTG&gt;,<br>
++				 &lt;&amp;camsys CLK_CAMSV0&gt;;<br>
++			clock-names = &quot;cam&quot;, &quot;camtg&quot;, &quot;camsv&quot;;<br>
++			iommus = &lt;&amp;iommu M4U_PORT_CAM_IMGO&gt;;<br>
++			mediatek,larb = &lt;&amp;larb2&gt;;<br>
++			power-domains = &lt;&amp;spm MT8365_POWER_DOMAIN_CAM&gt;;<br>
++			status = &quot;disabled&quot;;<br>
++<br>
++			ports {<br>
++				#address-cells = &lt;1&gt;;<br>
++				#size-cells = &lt;0&gt;;<br>
++				port@0 {<br>
++					reg = &lt;0&gt;;<br>
++					camsv1_endpoint: endpoint {<br>
++						remote-endpoint = &lt;&amp;seninf_camsv1_endpoint&gt;;<br>
++					};<br>
++				};<br>
++			};<br>
++		};<br>
++<br>
++		camsv2: camsv@15050800 {<br>
++			compatible = &quot;mediatek,mt8365-camsv&quot;;<br>
++			reg = &lt;0 0x15050800 0 0x0040&gt;,<br>
++			      &lt;0 0x15050228 0 0x0020&gt;,<br>
++			      &lt;0 0x15050c00 0 0x0100&gt;;<br>
++			interrupts = &lt;GIC_SPI 187 IRQ_TYPE_LEVEL_LOW&gt;;<br>
++			clocks = &lt;&amp;camsys CLK_CAM&gt;,<br>
++				 &lt;&amp;camsys CLK_CAMTG&gt;,<br>
++				 &lt;&amp;camsys CLK_CAMSV1&gt;;<br>
++			clock-names = &quot;cam&quot;, &quot;camtg&quot;, &quot;camsv&quot;;<br>
++			iommus = &lt;&amp;iommu M4U_PORT_CAM_IMGO&gt;;<br>
++			mediatek,larb = &lt;&amp;larb2&gt;;<br>
++			power-domains = &lt;&amp;spm MT8365_POWER_DOMAIN_CAM&gt;;<br>
++			status = &quot;disabled&quot;;<br>
++<br>
++			ports {<br>
++				#address-cells = &lt;1&gt;;<br>
++				#size-cells = &lt;0&gt;;<br>
++				port@0 {<br>
++					reg = &lt;0&gt;;<br>
++					camsv2_endpoint: endpoint {<br>
++						remote-endpoint = &lt;&amp;seninf_camsv2_endpoint&gt;;<br>
++					};<br>
++				};<br>
++			};<br>
++		};<br>
++<br>
+ 		vdecsys: syscon@16000000 {<br>
+ 			compatible = &quot;mediatek,mt8365-vdecsys&quot;, &quot;syscon&quot;;<br>
+ 			reg = &lt;0 0x16000000 0 0x1000&gt;;<br>
+<br>
+-- <br>
+2.47.1<br>
+<br>
+<br>
+<br>
+
+<!--X-Body-of-Message-End-->
+<!--X-MsgBody-End-->
+<!--X-Follow-Ups-->
+<hr NOSHADE>
+<!--X-Follow-Ups-End-->
+<!--X-References-->
+
+
+
+<!--X-References-End-->
+<!--X-BotPNI-->
+<ul>
+<li><strong>Next message: </strong> <a href="06546.html"> Julien Stephan: "[PATCH v8 4/5] media: platform: mediatek: isp: add mediatek ISP3.0 camsv"</a>
+
+<li><strong>Previous message: </strong> <a href="06544.html"> Julien Stephan: "[PATCH v8 2/5] dt-bindings: media: add mediatek ISP3.0 camsv"</a>
+
+<li><strong>In reply to: </strong> <a href="06544.html"> Julien Stephan: "[PATCH v8 2/5] dt-bindings: media: add mediatek ISP3.0 camsv"</a>
+
+<li><strong>Next in thread: </strong> <a href="06546.html"> Julien Stephan: "[PATCH v8 4/5] media: platform: mediatek: isp: add mediatek ISP3.0 camsv"</a>
+
+<li><strong>Messages sorted by: </strong><a href="date.html#06545">[ date ]</a> <a href="index.html#06545">[ thread ]</a> <a href="subject.html#06545">[ subject ]</a> <a href="author.html#06545">[ author ]</a>
+</ul>
+
+<!--X-BotPNI-End-->
+<!--X-User-Footer-->
+<!--X-User-Footer-End-->
+</body>
+</html>

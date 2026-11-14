@@ -1,0 +1,130 @@
+From 51ac74981ee5ff3f3b83cbf0acef20ef3fe77651 Mon Sep 17 00:00:00 2001
+From: Begonia <begonia@localhost>
+Date: Thu, 12 Nov 2026 14:28:44 +0100
+Subject: [PATCH 04/18] arm64: dts: mediatek: mt6785-xiaomi-begonia: Add the
+ battery and fuel gauge
+
+Describe the 4500 mAh battery (simple-battery, OCV table from the vendor
+battery profile at 25 degC) and the MT6359 FGADC fuel gauge, and link the
+MT6360 charger to the battery for its charge current and voltage limits.
+---
+ .../dts/mediatek/mt6785-xiaomi-begonia.dts    | 85 ++++++++++++++++++-
+ 1 file changed, 83 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/mediatek/mt6785-xiaomi-begonia.dts b/arch/arm64/boot/dts/mediatek/mt6785-xiaomi-begonia.dts
+index 4338ef853..ef7fbc846 100755
+--- a/arch/arm64/boot/dts/mediatek/mt6785-xiaomi-begonia.dts
++++ b/arch/arm64/boot/dts/mediatek/mt6785-xiaomi-begonia.dts
+@@ -18,6 +18,73 @@ / {
+ 	compatible = "xiaomi,begonia", "mediatek,mt6785";
+ 	chassis-type = "handset";
+ 
++	battery: battery {
++		compatible = "simple-battery";
++		device-chemistry = "lithium-ion";
++		/* typical 4500 mAh, minimum 4420 mAh; 4386 mAh usable down to 3.4 V (vendor profile) */
++		charge-full-design-microamp-hours = <4400000>;
++		voltage-min-design-microvolt = <3400000>;
++		voltage-max-design-microvolt = <4350000>;
++		/* cell ~115 mOhm + PCB 10 mOhm (vendor battery0_profile_t1 / FG_METER_RESISTANCE) */
++		factory-internal-resistance-micro-ohms = <125000>;
++		constant-charge-current-max-microamp = <2500000>;
++		constant-charge-voltage-max-microvolt = <4350000>;
++		charge-term-current-microamp = <250000>;
++		/* vendor battery0_profile_t1 (25 degC), resampled to 2% steps */
++		ocv-capacity-celsius = <25>;
++		ocv-capacity-table-0 = <4372000 100>,
++				      <4348092 98>,
++				      <4324218 96>,
++				      <4300820 94>,
++				      <4278306 92>,
++				      <4254948 90>,
++				      <4232147 88>,
++				      <4209399 86>,
++				      <4187313 84>,
++				      <4165383 82>,
++				      <4143911 80>,
++				      <4122474 78>,
++				      <4100987 76>,
++				      <4080927 74>,
++				      <4063397 72>,
++				      <4043531 70>,
++				      <4022095 68>,
++				      <4003150 66>,
++				      <3984776 64>,
++				      <3969395 62>,
++				      <3953229 60>,
++				      <3931977 58>,
++				      <3907470 56>,
++				      <3888199 54>,
++				      <3874236 52>,
++				      <3862401 50>,
++				      <3850856 48>,
++				      <3840730 46>,
++				      <3831977 44>,
++				      <3823500 42>,
++				      <3816212 40>,
++				      <3808854 38>,
++				      <3802217 36>,
++				      <3796381 34>,
++				      <3790546 32>,
++				      <3784669 30>,
++				      <3776771 28>,
++				      <3767055 26>,
++				      <3758267 24>,
++				      <3750403 22>,
++				      <3744056 20>,
++				      <3736729 18>,
++				      <3726826 16>,
++				      <3716455 14>,
++				      <3704063 12>,
++				      <3693228 10>,
++				      <3689621 8>,
++				      <3685070 6>,
++				      <3658981 4>,
++				      <3572048 2>,
++				      <3400000 0>;
++	};
++
+ 	chosen {
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
+@@ -250,15 +317,17 @@ pmic@34 {
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&mt6360_pins>;
+ 
+-		adc {
++		mt6360_adc: adc {
+ 			compatible = "mediatek,mt6360-adc";
+ 			#io-channel-cells = <1>;
+ 		};
+ 
+-		charger {
++		mt6360_charger: charger {
+ 			compatible = "mediatek,mt6360-chg";
+ 			richtek,vinovp-microvolt = <14500000>;
+ 
++			monitored-battery = <&battery>;
++
+ 			otg_vbus_regulator: usb-otg-vbus-regulator {
+ 				regulator-name = "usb-otg-vbus";
+ 				regulator-max-microvolt = <5825000>;
+@@ -732,6 +801,18 @@ &ufsphy {
+ 	status = "okay";
+ };
+ 
++&pmic {
++	fuel-gauge {
++		compatible = "mediatek,mt6359-fgadc";
++		/* battery voltage from the MT6360 ADC (VBAT, channel 4) */
++		io-channels = <&mt6360_adc 4>;
++		io-channel-names = "voltage";
++		power-supplies = <&mt6360_charger>;
++		monitored-battery = <&battery>;
++		shunt-resistor-micro-ohms = <5000>;
++	};
++};
++
+ &xhci {
+ 	vusb33-supply = <&mt6359_vusb_ldo_reg>;
+ 	status = "okay";

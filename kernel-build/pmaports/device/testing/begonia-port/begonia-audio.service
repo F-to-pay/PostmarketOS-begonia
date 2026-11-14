@@ -1,0 +1,12 @@
+[Unit]
+Description=Begonia MT6785 audio: initial mixer routing (safe defaults)
+After=sound.target systemd-modules-load.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/begonia/begonia-audio
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,39 @@
+From 89844bb7b40fccae1233ccddc7bb9f83719d9d7d Mon Sep 17 00:00:00 2001
+From: Begonia <begonia@localhost>
+Date: Fri, 13 Nov 2026 23:53:06 +0100
+Subject: [PATCH 18/18] drm/panel: nt36672a: Use the downstream reset sequence
+ for the CSOT panel
+
+The CSOT panel of the Redmi Note 8 Pro stays dark after boot until the
+first DPMS off/on cycle: the bootloader leaves it running, and a single
+5ms reset pulse followed by commands 5ms later does not bring it back
+into a known state. Downstream resets it twice and waits 11ms before
+the first command; do the same.
+
+Signed-off-by: Begonia <begonia@localhost>
+---
+ drivers/gpu/drm/panel/panel-novatek-nt36672a.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/gpu/drm/panel/panel-novatek-nt36672a.c b/drivers/gpu/drm/panel/panel-novatek-nt36672a.c
+index a50ea7e1c..fda89acf6 100644
+--- a/drivers/gpu/drm/panel/panel-novatek-nt36672a.c
++++ b/drivers/gpu/drm/panel/panel-novatek-nt36672a.c
+@@ -638,9 +638,17 @@ static const struct nt36672a_panel_cmd csot_fhd_video_off_cmds[] = {
+ 	{ .data = {0xFF, 0x10} },
+ };
+ 
++/*
++ * Downstream (csot_fhd_nt36672a_dsi_vdo) resets the panel twice and waits 11ms before the
++ * first command. A single 5ms pulse is enough for a cold panel (after DPMS off), but not
++ * for the one the bootloader left running: the first modeset after boot then leaves the
++ * panel dark until the next DPMS cycle.
++ */
+ static const struct nt36672a_panel_reset_seq csot_fhd_video_reset_seq[] = {
+ 	{ .gpio_value = 1, .sleep_msecs = 5 },
+ 	{ .gpio_value = 0, .sleep_msecs = 5 },
++	{ .gpio_value = 1, .sleep_msecs = 1 },
++	{ .gpio_value = 0, .sleep_msecs = 11 },
+ };
+ 
+ static const struct drm_display_mode csot_fhd_video_panel_default_mode = {

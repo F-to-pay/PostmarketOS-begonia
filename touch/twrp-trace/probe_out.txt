@@ -1,0 +1,93 @@
+== tracing dir:
+README
+available_events
+available_tracers
+buffer_size_kb
+buffer_total_size_kb
+current_tracer
+events
+free_buffer
+instances
+options
+per_cpu
+printk_formats
+saved_cmdlines
+saved_cmdlines_size
+saved_tgids
+set_event
+set_event_pid
+snapshot
+trace
+trace_clock
+== spi events:
+enable
+filter
+spi_controller_busy
+spi_controller_idle
+spi_message_done
+spi_message_start
+spi_message_submit
+spi_transfer_start
+spi_transfer_stop
+---- format spi_transfer_start
+name: spi_transfer_start
+	field:unsigned short common_type;	offset:0;	size:2;	signed:0;
+	field:unsigned char common_flags;	offset:2;	size:1;	signed:0;
+	field:unsigned char common_preempt_count;	offset:3;	size:1;	signed:0;
+	field:int common_pid;	offset:4;	size:4;	signed:1;
+	field:int bus_num;	offset:8;	size:4;	signed:1;
+	field:int chip_select;	offset:12;	size:4;	signed:1;
+	field:struct spi_transfer * xfer;	offset:16;	size:8;	signed:0;
+	field:int len;	offset:24;	size:4;	signed:1;
+print fmt: "spi%d.%d %p len=%d", (int)REC->bus_num, (int)REC->chip_select, (struct spi_message *)REC->xfer, (int)REC->len
+---- format spi_transfer_stop
+name: spi_transfer_stop
+	field:unsigned short common_type;	offset:0;	size:2;	signed:0;
+	field:unsigned char common_flags;	offset:2;	size:1;	signed:0;
+	field:unsigned char common_preempt_count;	offset:3;	size:1;	signed:0;
+	field:int common_pid;	offset:4;	size:4;	signed:1;
+	field:int bus_num;	offset:8;	size:4;	signed:1;
+	field:int chip_select;	offset:12;	size:4;	signed:1;
+	field:struct spi_transfer * xfer;	offset:16;	size:8;	signed:0;
+	field:int len;	offset:24;	size:4;	signed:1;
+print fmt: "spi%d.%d %p len=%d", (int)REC->bus_num, (int)REC->chip_select, (struct spi_message *)REC->xfer, (int)REC->len
+---- format spi_message_start
+name: spi_message_start
+	field:unsigned short common_type;	offset:0;	size:2;	signed:0;
+	field:unsigned char common_flags;	offset:2;	size:1;	signed:0;
+	field:unsigned char common_preempt_count;	offset:3;	size:1;	signed:0;
+	field:int common_pid;	offset:4;	size:4;	signed:1;
+	field:int bus_num;	offset:8;	size:4;	signed:1;
+	field:int chip_select;	offset:12;	size:4;	signed:1;
+	field:struct spi_message * msg;	offset:16;	size:8;	signed:0;
+print fmt: "spi%d.%d %p", (int)REC->bus_num, (int)REC->chip_select, (struct spi_message *)REC->msg
+---- format spi_message_done
+name: spi_message_done
+	field:unsigned short common_type;	offset:0;	size:2;	signed:0;
+	field:unsigned char common_flags;	offset:2;	size:1;	signed:0;
+	field:unsigned char common_preempt_count;	offset:3;	size:1;	signed:0;
+	field:int common_pid;	offset:4;	size:4;	signed:1;
+	field:int bus_num;	offset:8;	size:4;	signed:1;
+	field:int chip_select;	offset:12;	size:4;	signed:1;
+	field:struct spi_message * msg;	offset:16;	size:8;	signed:0;
+	field:unsigned frame;	offset:24;	size:4;	signed:0;
+	field:unsigned actual;	offset:28;	size:4;	signed:0;
+print fmt: "spi%d.%d %p len=%u/%u", (int)REC->bus_num, (int)REC->chip_select, (struct spi_message *)REC->msg, (unsigned)REC->actual, (unsigned)REC->frame
+---- format spi_message_submit
+name: spi_message_submit
+	field:unsigned short common_type;	offset:0;	size:2;	signed:0;
+	field:unsigned char common_flags;	offset:2;	size:1;	signed:0;
+	field:unsigned char common_preempt_count;	offset:3;	size:1;	signed:0;
+	field:int common_pid;	offset:4;	size:4;	signed:1;
+	field:int bus_num;	offset:8;	size:4;	signed:1;
+	field:int chip_select;	offset:12;	size:4;	signed:1;
+	field:struct spi_message * msg;	offset:16;	size:8;	signed:0;
+print fmt: "spi%d.%d %p", (int)REC->bus_num, (int)REC->chip_select, (struct spi_message *)REC->msg
+== kernel config bits (if exposed):
+CONFIG_HZ=250
+CONFIG_SPI=y
+CONFIG_SPI_MT65XX=y
+CONFIG_EVENT_TRACING=y
+CONFIG_TRACING=y
+CONFIG_FTRACE=y
+== fb0 blank:

@@ -1,0 +1,118 @@
+=== of_node spi5.0
+/sys/firmware/devicetree/base/spi5@11019000/touch_spi@0
+compatible = xiaomi,spi-for-tp 
+   hex:  78 69 61 6f 6d 69 2c 73 70 69 2d 66 6f 72 2d 74 70 00
+name = touch_spi 
+   hex:  74 6f 75 63 68 5f 73 70 69 00
+reg =     
+   hex:  00 00 00 00
+spi-max-frequency =  ˜–€
+   hex:  00 98 96 80
+status = ok 
+   hex:  6f 6b 00
+=== of_node subdirs
+total 0
+drwxr-xr-x 2 root root  0 2094-10-27 18:32 .
+drwxr-xr-x 3 root root  0 2094-10-27 18:32 ..
+-r--r--r-- 1 root root 18 2094-10-27 18:32 compatible
+-r--r--r-- 1 root root 10 2094-10-27 18:32 name
+-r--r--r-- 1 root root  4 2094-10-27 18:32 reg
+-r--r--r-- 1 root root  4 2094-10-27 18:32 spi-max-frequency
+-r--r--r-- 1 root root  3 2094-10-27 18:32 status
+=== spi5 master of_node
+ls: /sys/devices/platform/11019000.spi5/spi_master/of_node: No such file or directory
+=== regulator summary
+ regulator                      use open bypass voltage current     min     max
+-------------------------------------------------------------------------------
+ regulator-dummy                  0   11      0     0mV     0mA     0mV     0mV 
+    kd_camera_hw1@1a040000                                          0mV     0mV
+    kd_camera_hw1@1a040000                                          0mV     0mV
+    kd_camera_hw1@1a040000                                          0mV     0mV
+    kd_camera_hw1@1a040000                                          0mV     0mV
+    kd_camera_hw1@1a040000                                          0mV     0mV
+    kd_camera_hw1@1a040000                                          0mV     0mV
+    kd_camera_hw1@1a040000                                          0mV     0mV
+    kd_camera_hw1@1a040000                                          0mV     0mV
+    kd_camera_hw1@1a040000                                          0mV     0mV
+    kd_camera_hw1@1a040000                                          0mV     0mV
+    usbphy                                                          0mV     0mV
+ vs1                              0    0      0  2000mV     0mA   800mV  2200mV 
+ vgpu11                           0    1      0   400mV     0mA   400mV  1193mV 
+    gpufreq                                                       800mV   950mV
+ vmodem                           0    0      0   875mV     0mA   400mV  1100mV 
+ vpu                              0    1      0   400mV     0mA   400mV  1193mV 
+    gpufreq                                                       900mV  1050mV
+ vcore                            0    2      0   825mV     0mA   400mV  1193mV 
+    19180000.apu_dvfs                                               0mV     0mV
+    mmdvfs_pmqos                                                    0mV     0mV
+ vs2                              0    0      0  1350mV     0mA   800mV  1600mV 
+ vpa                              0    0      0   500mV     0mA   500mV  3650mV 
+ vproc2                           0    2      0   706mV     0mA   400mV  1193mV 
+    1100b000.eem_fsm                                                0mV     0mV
+    mt_cpufreq                                                      0mV     0mV
+ vproc1                           0    2      0   900mV     0mA   400mV  1193mV 
+    1100b000.eem_fsm                                                0mV     0mV
+    mt_cpufreq                                                      0mV     0mV
+ vaud18                           0    0      0  1800mV     0mA  1800mV  1800mV 
+ vsim1                            0    0      0  1800mV     0mA  1700mV  3100mV 
+ vibr                             0    0      0  2800mV     0mA  1200mV  3300mV 
+ vrf12                            0    0      0  1200mV     0mA  1100mV  1300mV 
+ vusb                             1    1      0  3000mV     0mA  3000mV  3000mV 
+    musb-hdrc                                                       0mV     0mV
+ vsram_proc2                      0    1      0   850mV     0mA   500mV  1193mV 
+    mt_cpufreq                                                      0mV     0mV
+ vio18                            0    0      0  1800mV     0mA  1700mV  1900mV 
+ vcamio                           0    6      0  1800mV     0mA  1700mV  1900mV 
+    kd_camera_hw1@1a040000                                          0mV     0mV
+    kd_camera_hw1@1a040000                                          0mV     0mV
+    kd_camera_hw1@1a040000                                          0mV     0mV
+    kd_camera_hw1@1a040000                                          0mV     0mV
+    kd_camera_hw1@1a040000                                          0mV     0mV
+    MAINAF                                                          0mV     0mV
+ vcn18                            0    0      0  1800mV     0mA  1800mV  1800mV 
+ vfe28                            0    0      0  2800mV     0mA  2800mV  2800mV 
+ vcn13                            0    0      0  1300mV     0mA   900mV  1300mV 
+ vcn33_1_bt                       0    0      0  3500mV     0mA  2800mV  3500mV 
+ vcn33_1_wifi                     0    0      0  3500mV     0mA  2800mV  3500mV 
+ vaux18                           0    0      0  1800mV     0mA  1800mV  1800mV 
+ vsram_others                     0    0      0   875mV     0mA   500mV  1193mV 
+ vefuse                           0    0      0  1800mV     0mA  1700mV  2000mV 
+ vxo22                            0    0      0  2200mV     0mA  1800mV  2200mV 
+ vrfck                            0    0      0  1600mV     0mA  1500mV  1700mV 
+ vbif28                           0    0      0  2800mV     0mA  2800mV  2800mV 
+ vio28                            0    0      0  3000mV     0mA  2800mV  3300mV 
+ vemc                             0    1      0  3000mV     0mA  2900mV  3300mV 
+    bootdevice                                                      0mV     0mV
+ vcn33_2_bt                       0    0      0  3500mV     0mA  2800mV  3500mV 
+ vcn33_2_wifi                     0    0      0  3500mV     0mA  2800mV  3500mV 
+ va12                             0    0      0  1200mV     0mA  1200mV  1300mV 
+ va09                             1    2      0   900mV     0mA   800mV  1200mV 
+    musb-hdrc                                                       0mV     0mV
+    bootdevice                                                      0mV     0mV
+ vrf18                            0    0      0  1800mV     0mA  1700mV  1810mV 
+ vsram_md                         0    0      0   993mV     0mA   500mV  1100mV 
+ vufs                             0    0      0  1800mV     0mA  1700mV  1900mV 
+ vm18                             0    0      0  1800mV     0mA  1700mV  1900mV 
+ vbbck                            0    0      0  1200mV     0mA  1100mV  1200mV 
+ vsram_proc1                      0    1      0  1000mV     0mA   500mV  1193mV 
+    mt_cpufreq                                                      0mV     0mV
+ vsim2                            0    0      0  1800mV     0mA  1700mV  3100mV 
+ VMDLA                            0    1      0   550mV     0mA   300mV  1300mV 
+    19180000.apu_dvfs                                             550mV   900mV
+ VDRAM1                           0    0      0  1125mV     0mA   300mV  1300mV 
+ VMDDR                            0    0      0   750mV     0mA   500mV  2100mV 
+ VDRAM2                           0    0      0   600mV     0mA   500mV  2100mV 
+=== gpio
+ gpio-303 (                    |NVT-tp-rst          ) out hi    
+ gpio-317 (                    |5-0034.irq          ) in  hi IRQ
+ gpio-389 (                    |nfc_irq_gpio        ) in  lo IRQ
+=== pinctrl
+pinctrl
+pinctrl-devices
+pinctrl-handles
+pinctrl-maps
+=== vendor fw
+-rw-r--r--  1 root root   38026 2009-01-01 00:00 NT36xxx_MP_Setting_Criteria_5920.csv
+-rw-r--r--  1 root root   38062 2009-01-01 00:00 NT36xxx_MP_Setting_Criteria_5921.csv
+md5sum: /tmp/venm/firmware/novatek_ts_fw.bin: No such file or directory
+sha256sum: /tmp/venm/firmware/novatek_ts_fw.bin: No such file or directory

@@ -1,0 +1,20 @@
+== kprobe/uprobe files:
+uprobe_events
+uprobe_profile
+== README mentions of fetch args / arrays:
+43:	     args: <name>=fetcharg[:type]
+44:	 fetcharg: %<register>, @<address>, @<symbol>[+|-<offset>],
+46:	     type: s8/16/32/64, u8/16/32/64, x8/16/32/64, string,
+== kallsyms sample:
+0000000000000000 T spi_sync
+0000000000000000 t __spi_sync
+0000000000000000 T spi_sync_locked
+0000000000000000 t spi_transfer_one_message
+0000000000000000 t mtk_spi_transfer_one
+0000000000000000 T CTP_SPI_READ
+0000000000000000 T nvt_set_page
+== kallsyms readable addresses?
+0000000000000000 T do_undefinstr
+0000000000000000 T _stext
+== kptr_restrict:
+2

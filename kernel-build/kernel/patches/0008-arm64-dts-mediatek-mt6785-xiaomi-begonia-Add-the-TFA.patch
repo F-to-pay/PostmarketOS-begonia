@@ -1,0 +1,113 @@
+From a6d9adf11c31f12261707160a3638b34d356562e Mon Sep 17 00:00:00 2001
+From: Begonia <begonia@localhost>
+Date: Thu, 12 Nov 2026 17:50:29 +0100
+Subject: [PATCH 08/18] arm64: dts: mediatek: mt6785-xiaomi-begonia: Add the
+ TFA9874 speaker amplifier
+
+i2c6 (GPIO45/46), the nxp,tfa9874 SmartPA at 0x34 (reset GPIO24, irq GPIO69)
+and the I2S3 pin states (GPIO67/68/71) for the loudspeaker path.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ .../boot/dts/mediatek/audio-begonia.dtsi      | 63 ++++++++++++++++++-
+ 1 file changed, 60 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/mediatek/audio-begonia.dtsi b/arch/arm64/boot/dts/mediatek/audio-begonia.dtsi
+index 4960ae943..f9c42d4b3 100644
+--- a/arch/arm64/boot/dts/mediatek/audio-begonia.dtsi
++++ b/arch/arm64/boot/dts/mediatek/audio-begonia.dtsi
+@@ -5,13 +5,14 @@
+  * Included at the end of arch/arm64/boot/dts/mediatek/mt6785-xiaomi-begonia.dts:
+  *     #include "audio-begonia.dtsi"
+  *
+- * Stage 1: only the built-in MT6359 codec (earpiece, headphones, analog
+- * microphones). The external SmartPA TFA9874 (i2c6@0x34, I2S3) - stage 2, see NOTES.md.
++ * The built-in MT6359 codec (earpiece, headphones, analog microphones) +
++ * SmartPA TFA9874 (i2c6@0x34, audio over I2S3) for the loudspeaker, see NOTES.md.
+  * The clock names match the aud_clks[] array in mt6785-afe-clk.c; the clocks
+  * top_i2s6..9 / apll12_div6..9 do not exist on MT6785 - the driver skips them (NULL).
+  */
+ 
+ #include <dt-bindings/clock/mediatek,mt6785-clk.h>
++#include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/pinctrl/mediatek,mt6785-pinfunc.h>
+@@ -190,6 +191,59 @@ pins-dat {
+ 			bias-disable;
+ 		};
+ 	};
++
++	/* Speaker: SmartPA TFA9874. I2C6 = GPIO45/46, reset GPIO24, irq GPIO69, audio I2S3 = GPIO67/68/71 */
++	i2c6_pins: i2c6-pins {
++		pins-bus {
++			pinmux = <PINMUX_GPIO45__FUNC_SCL6>,
++				 <PINMUX_GPIO46__FUNC_SDA6>;
++			bias-pull-up;
++		};
++	};
++	tfa9874_pins: tfa9874-pins {
++		pins-reset {
++			pinmux = <PINMUX_GPIO24__FUNC_GPIO24>;
++			output-low;
++		};
++		pins-irq {
++			pinmux = <PINMUX_GPIO69__FUNC_GPIO69>;
++			input-enable;
++			bias-pull-up;
++		};
++	};
++	aud_gpio_i2s3_off: aud-gpio-i2s3-off-pins {
++		pins-i2s3 {
++			pinmux = <PINMUX_GPIO67__FUNC_GPIO67>,
++				 <PINMUX_GPIO68__FUNC_GPIO68>,
++				 <PINMUX_GPIO71__FUNC_GPIO71>;
++			input-enable;
++			bias-pull-down;
++		};
++	};
++	aud_gpio_i2s3_on: aud-gpio-i2s3-on-pins {
++		pins-i2s3 {
++			pinmux = <PINMUX_GPIO67__FUNC_I2S3_LRCK>,
++				 <PINMUX_GPIO68__FUNC_I2S3_DO>,
++				 <PINMUX_GPIO71__FUNC_I2S3_BCK>;
++			bias-disable;
++		};
++	};
++};
++
++&i2c6 {
++	clock-frequency = <400000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c6_pins>;
++	status = "okay";
++
++	speaker_amp: audio-codec@34 {
++		compatible = "nxp,tfa9874";
++		reg = <0x34>;
++		#sound-dai-cells = <0>;
++		reset-gpios = <&pio 24 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&tfa9874_pins>;
++	};
+ };
+ 
+ / {
+@@ -202,7 +256,8 @@ sound: sound {
+ 				"aud_dat_mosi_off", "aud_dat_mosi_on",
+ 				"aud_dat_miso_off", "aud_dat_miso_on",
+ 				"aud_dat_mosi_ch34_off", "aud_dat_mosi_ch34_on",
+-				"aud_dat_miso_ch34_off", "aud_dat_miso_ch34_on";
++				"aud_dat_miso_ch34_off", "aud_dat_miso_ch34_on",
++				"aud_gpio_i2s3_off", "aud_gpio_i2s3_on";
+ 		pinctrl-0 = <&aud_clk_mosi_off>;
+ 		pinctrl-1 = <&aud_clk_mosi_on>;
+ 		pinctrl-2 = <&aud_dat_mosi_off>;
+@@ -213,5 +268,7 @@ sound: sound {
+ 		pinctrl-7 = <&aud_dat_mosi_ch34_on>;
+ 		pinctrl-8 = <&aud_dat_miso_ch34_off>;
+ 		pinctrl-9 = <&aud_dat_miso_ch34_on>;
++		pinctrl-10 = <&aud_gpio_i2s3_off>;
++		pinctrl-11 = <&aud_gpio_i2s3_on>;
+ 	};
+ };

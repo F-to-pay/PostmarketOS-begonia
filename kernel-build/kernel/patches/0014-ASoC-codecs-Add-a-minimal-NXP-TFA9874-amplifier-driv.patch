@@ -1,0 +1,894 @@
+From e9f9dd6e3b349b8d62b1e159ce139579bdb38161 Mon Sep 17 00:00:00 2001
+From: Begonia <begonia@localhost>
+Date: Fri, 13 Nov 2026 22:43:23 +0100
+Subject: [PATCH 14/18] ASoC: codecs: Add a minimal NXP TFA9874 amplifier
+ driver
+
+Bring the amplifier up the way the vendor tfa98xx driver does, without
+the DSP: reset, revision specific registers, device and profile
+registers from the (decoded) vendor container, then power up and enable
+the amplifier from a DAPM event once I2S provides BCK.
+
+A 100 ms status poller turns the amplifier off on OCP/OTP/UVP, retries
+after 3 s and latches after three faults in a minute
+(debugfs: tfa9874-fault, 'reset' / 'inject'). The hardware gain is
+capped at -18 dB: the speaker of the test device distorts above that.
+
+Signed-off-by: Begonia <begonia@localhost>
+---
+ sound/soc/codecs/Kconfig   |  11 +
+ sound/soc/codecs/Makefile  |   2 +
+ sound/soc/codecs/tfa9874.c | 815 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 828 insertions(+)
+ create mode 100755 sound/soc/codecs/tfa9874.c
+
+diff --git a/sound/soc/codecs/Kconfig b/sound/soc/codecs/Kconfig
+index 126f89731..a28a43b11 100644
+--- a/sound/soc/codecs/Kconfig
++++ b/sound/soc/codecs/Kconfig
+@@ -273,6 +273,7 @@ config SND_SOC_ALL_CODECS
+ 	imply SND_SOC_TAS6424
+ 	imply SND_SOC_TDA7419
+ 	imply SND_SOC_TFA9879
++	imply SND_SOC_TFA9874
+ 	imply SND_SOC_TFA989X
+ 	imply SND_SOC_TLV320ADC3XXX
+ 	imply SND_SOC_TLV320ADCX140
+@@ -2095,6 +2096,16 @@ config SND_SOC_TFA9879
+ 	tristate "NXP Semiconductors TFA9879 amplifier"
+ 	depends on I2C
+ 
++config SND_SOC_TFA9874
++	tristate "NXP TFA9874 amplifier (DSP bypass)"
++	depends on I2C
++	select REGMAP_I2C
++	help
++	  Minimal driver for the NXP TFA9874 smart amplifier as used on the
++	  Xiaomi Redmi Note 8 Pro. The CoolFlux DSP is not used: the vendor
++	  container has no speaker model, so the amplifier runs on its
++	  hardware protections only. Includes a status watchdog.
++
+ config SND_SOC_TFA989X
+ 	tristate "NXP/Goodix TFA989X (TFA1) amplifiers"
+ 	depends on I2C
+diff --git a/sound/soc/codecs/Makefile b/sound/soc/codecs/Makefile
+index 6d7aa109e..445ab28d8 100644
+--- a/sound/soc/codecs/Makefile
++++ b/sound/soc/codecs/Makefile
+@@ -314,6 +314,7 @@ snd-soc-tas2781-comlib-i2c-y := tas2781-comlib-i2c.o
+ snd-soc-tas2781-fmwlib-y := tas2781-fmwlib.o
+ snd-soc-tas2781-i2c-y := tas2781-i2c.o
+ snd-soc-tfa9879-y := tfa9879.o
++snd-soc-tfa9874-y := tfa9874.o
+ snd-soc-tfa989x-y := tfa989x.o
+ snd-soc-tlv320adc3xxx-y := tlv320adc3xxx.o
+ snd-soc-tlv320aic23-y := tlv320aic23.o
+@@ -735,6 +736,7 @@ obj-$(CONFIG_SND_SOC_TAS6424)	+= snd-soc-tas6424.o
+ obj-$(CONFIG_SND_SOC_TDA7419)	+= snd-soc-tda7419.o
+ obj-$(CONFIG_SND_SOC_TAS2770) += snd-soc-tas2770.o
+ obj-$(CONFIG_SND_SOC_TFA9879)	+= snd-soc-tfa9879.o
++obj-$(CONFIG_SND_SOC_TFA9874)	+= snd-soc-tfa9874.o
+ obj-$(CONFIG_SND_SOC_TFA989X)	+= snd-soc-tfa989x.o
+ obj-$(CONFIG_SND_SOC_TLV320ADC3XXX)	+= snd-soc-tlv320adc3xxx.o
+ obj-$(CONFIG_SND_SOC_TLV320AIC23)	+= snd-soc-tlv320aic23.o
+diff --git a/sound/soc/codecs/tfa9874.c b/sound/soc/codecs/tfa9874.c
+new file mode 100755
+index 000000000..5451057a5
+--- /dev/null
++++ b/sound/soc/codecs/tfa9874.c
+@@ -0,0 +1,815 @@
++// SPDX-License-Identifier: GPL-2.0
++//
++// tfa9874.c  --  NXP TFA9874 smart amplifier, minimal ASoC codec driver
++//                (Redmi Note 8 Pro / begonia, i2c6@0x34, audio over I2S3).
++//
++// This is NOT a port of the vendor tfa98xx (4k lines + DSP/calibration). The vendor
++// firmware tfa98xx.cnt for this phone is 646 bytes: a stub patch
++// ("9874_dummy.patch") and one profile "speaker", i.e. there is no DSP speaker model,
++// the amplifier runs on hardware protection only (OCP/OTP/UVP + DC-DC settings
++// from the container). So the driver simply repeats the vendor
++// start-up sequence without the DSP:
++//   1) I2CR (register reset) -> keys -> "optimal" registers by revision
++//      (tfa9874_specific());
++//   2) device registers/bit fields from the container (TDM, gain, DC-DC);
++//   3) registers of the "speaker" profile (DCA, DCIE, LPM1MODE, LNMODE, AUDFS=48k);
++//   4) INIT_CF: MANSCONF=1, PWDN=0, wait for CLKS (needs BCK from the SoC!);
++//   5) OPERATING: AMPE=1 (amplifier on).
++// Steps 4-5 are done in the DAPM event of the "Speaker Amp" widget (POST_PMU), i.e. in
++// process context (one cannot sleep on i2c in trigger!), when I2S3 is already on
++// and clocks BCK; the reverse is PRE_PMD: AMPE=0, PWDN=1. If there is no BCK, the amplifier
++// stays off and the stream does NOT fail (playback to the other outputs
++// must not suffer because of the speaker).
++//
++// Sources: kernel-r-oss sound/soc/codecs/tfa98xx (tfa_init.c: tfa9874_specific,
++// tfa_dsp.c: tfa_dev_set_state / tfa98xx_powerdown), the container was decoded
++// by the script audio/tfa-fw/decode2.py.
++
++#include <linux/debugfs.h>
++#include <linux/delay.h>
++#include <linux/gpio/consumer.h>
++#include <linux/i2c.h>
++#include <linux/module.h>
++#include <linux/mutex.h>
++#include <linux/of.h>
++#include <linux/regmap.h>
++#include <linux/uaccess.h>
++#include <linux/workqueue.h>
++#include <linux/seq_file.h>
++#include <sound/pcm.h>
++#include <sound/pcm_params.h>
++#include <sound/soc.h>
++#include <sound/tlv.h>
++
++/* Fields as in tfa9874_tfafieldnames.h: (reg << 8) | (position << 4) | (length - 1) */
++#define BF_PWDN		0x0000
++#define BF_I2CR		0x0010
++#define BF_AMPE		0x0030
++#define BF_DCA		0x0040
++#define BF_MANSCONF	0x0120
++#define BF_AMPGAIN	0x5257
++#define BF_AUDFS	0x0203
++#define BF_REV		0x030f
++#define BF_CLKS		0x1170
++#define BF_PLLS		0x1160
++#define BF_AMPS		0x11e0
++#define BF_MANSTATE	0x1433
++#define BF_LNMODE	0x62e1
++#define BF_LPM1MODE	0x64e1
++#define BF_DCIE		0x7090
++
++#define BF_REG(f)	((f) >> 8)
++#define BF_POS(f)	(((f) >> 4) & 0xf)
++#define BF_LEN(f)	(((f) & 0xf) + 1)
++#define BF_MASK(f)	(((1U << BF_LEN(f)) - 1) << BF_POS(f))
++
++#define TFA_REG_STATUS	0x10
++#define TFA_REG_KEYS	0x0f
++#define TFA_REG_KEY1	0xa0
++#define TFA_REG_KEY2	0xa1		/* MTPKEY2 */
++#define TFA_REG_KEY1_RB	0xfb
++
++#define TFA9874_FAMILY_ID	0x74	/* low byte of REV */
++
++/*
++ * Safety fuse: allow_amp=0 forbids turning the amplifier on (default 1:
++ * the amplifier turns on only when a stream is deliberately routed to the speaker). Change on the fly:
++ *   echo 1 | sudo tee /sys/module/snd_soc_tfa9874/parameters/allow_amp
++ */
++static bool allow_amp = true;
++module_param(allow_amp, bool, 0644);
++MODULE_PARM_DESC(allow_amp, "allow turning the speaker amplifier on (default 1)");
++
++struct tfa9874 {
++	struct device *dev;
++	struct regmap *regmap;
++	struct gpio_desc *reset;
++	struct mutex lock;
++	unsigned int rev;
++	bool powered;
++	unsigned int vol;	/* volume control index (0..TFA_VOL_MAX) */
++	struct dentry *dbg;
++	struct dentry *dbg_fault;
++
++	/* protection: status watchdog (see tfa9874_monitor) */
++	struct delayed_work mon;
++	struct delayed_work retry;	/* automatic restart after a pause while DAPM holds the stream */
++	bool want_on;			/* DAPM wants the amplifier running (a stream is on) */
++	unsigned int bad_hard, bad_soft, bad_i2c;	/* bad polls in a row */
++	unsigned int fault_count;			/* faults since the last reset */
++	unsigned long fault_t[3];			/* times of the last three faults */
++	unsigned int fault_idx;
++	unsigned long cooldown_until;
++	bool latched;					/* latch: amplifier blocked until reset */
++};
++
++/* ---- register access ---------------------------------------------------- */
++
++static int tfa_bf_set(struct tfa9874 *t, unsigned int bf, unsigned int val)
++{
++	return regmap_update_bits(t->regmap, BF_REG(bf), BF_MASK(bf),
++				  val << BF_POS(bf));
++}
++
++static int tfa_bf_get(struct tfa9874 *t, unsigned int bf, unsigned int *val)
++{
++	unsigned int v;
++	int ret = regmap_read(t->regmap, BF_REG(bf), &v);
++
++	if (ret)
++		return ret;
++	*val = (v & BF_MASK(bf)) >> BF_POS(bf);
++	return 0;
++}
++
++static const struct regmap_config tfa9874_regmap = {
++	.reg_bits = 8,
++	.val_bits = 16,
++	.val_format_endian = REGMAP_ENDIAN_BIG,
++	.max_register = 0xff,
++	.cache_type = REGCACHE_NONE,
++};
++
++/* ---- tables from the vendor code/container ------------------------------- */
++
++struct reg_val {
++	u8 reg;
++	u16 val;
++};
++
++/* tfa9874_specific(): "optimal" values by die revision. */
++static const struct reg_val rev_0a74[] = {
++	{ 0x02, 0x22a8 }, { 0x51, 0x0020 }, { 0x52, 0x57dc }, { 0x58, 0x16a4 },
++	{ 0x61, 0x0110 }, { 0x66, 0x0701 }, { 0x6f, 0x00a3 }, { 0x70, 0x07f8 },
++	{ 0x73, 0x0007 }, { 0x74, 0x5068 }, { 0x75, 0x0d28 }, { 0x83, 0x0594 },
++	{ 0x84, 0x0001 }, { 0x85, 0x0001 }, { 0x88, 0x0000 }, { 0xc4, 0x2001 },
++};
++
++static const struct reg_val rev_0b74[] = {
++	{ 0x02, 0x22a8 }, { 0x51, 0x0020 }, { 0x52, 0x57dc }, { 0x58, 0x16a4 },
++	{ 0x61, 0x0110 }, { 0x66, 0x0701 }, { 0x6f, 0x00a3 }, { 0x70, 0x07f8 },
++	{ 0x73, 0x0047 }, { 0x74, 0x5068 }, { 0x75, 0x0d28 }, { 0x83, 0x0595 },
++	{ 0x84, 0x0001 }, { 0x85, 0x0001 }, { 0x88, 0x0000 }, { 0xc4, 0x2001 },
++};
++
++static const struct reg_val rev_0c74[] = {
++	{ 0x02, 0x22c8 }, { 0x52, 0x57dc }, { 0x53, 0x003e }, { 0x56, 0x0400 },
++	{ 0x61, 0x0110 }, { 0x6f, 0x00a5 }, { 0x70, 0x07f8 }, { 0x73, 0x0047 },
++	{ 0x74, 0x5098 }, { 0x75, 0x8d28 }, { 0x80, 0x0000 }, { 0x83, 0x0799 },
++	{ 0x84, 0x0081 },
++};
++
++/* Container tfa98xx.cnt, device section: raw registers. */
++static const struct reg_val cnt_dev_regs[] = {
++	{ 0x0f, 0x5a6b }, { 0xa1, 0x005a }, { 0xa0, 0x005a },
++};
++
++struct bf_val {
++	u16 bf;
++	u16 val;
++};
++
++/*
++ * Container tfa98xx.cnt, device section: bit fields, in file order.
++ * Field name (per tfa9874_tfafieldnames.h) - in the comment; "?" - not in the header.
++ * TDM values: 32-bit slot, 24-bit sample, 2 slots (stereo I2S, BCK = 64*fs).
++ */
++static const struct bf_val cnt_dev_bfs[] = {
++	{ 0x20c3, 0x02 },	/* TDMNBCK */
++	{ 0x2144, 0x1f },	/* TDMSLLN: slot length 32 */
++	{ 0x2224, 0x17 },	/* TDMSSIZE: 24-bit sample */
++	{ 0x2103, 0x01 },	/* TDMSLOTS */
++	{ 0x2330, 0x01 },	/* TDMCSE */
++	{ 0x2340, 0x01 },	/* TDMVSE */
++	{ 0x26c3, 0x01 },	/* TDMCSS */
++	{ 0x2703, 0x00 },	/* TDMVSS */
++	{ 0x6802, 0x02 },	/* TDMSRCMAP */
++	{ 0x2603, 0x00 },	/* TDMSPKS: audio in slot 0 */
++	{ 0x2643, 0x01 },	/* TDMDCS */
++	{ 0x2310, 0x00 },	/* TDMDCE */
++	{ 0x6163, 0x04 },	/* TDMSPKG */
++	{ 0x6123, 0x0f },	/* TDMDCG */
++	{ 0x6831, 0x01 },	/* TDMSRCAS */
++	{ 0x6851, 0x02 },	/* TDMSRCBS */
++	{ 0x0255, 0x16 },	/* FRACTDEL */
++	{ 0x5257, 0xbe },	/* AMPGAIN */
++	{ 0x64e1, 0x02 },	/* LPM1MODE */
++	{ 0x5350, 0x01 },
++	{ 0x5690, 0x00 },
++	{ 0x6f02, 0x05 },	/* DELCURCOMP */
++	{ 0x6f72, 0x01 },	/* LVLCLPPWM */
++	{ 0x7071, 0x03 },	/* DCCV */
++	{ 0x7430, 0x01 },	/* DCTRACK */
++	{ 0x7494, 0x08 },	/* DCHOLD */
++	{ 0x75f0, 0x01 },	/* DCTRIPHYSTE */
++	{ 0x74f0, 0x00 },
++	{ 0x8001, 0x00 },
++	{ 0x8305, 0x19 },
++	{ 0x8364, 0x1e },
++	{ 0x8453, 0x04 },
++	{ 0x5150, 0x00 },	/* HPFBYP */
++	{ 0x5844, 0x01 },
++	{ 0x6f50, 0x01 },	/* ENCURCOMP */
++	{ 0x8510, 0x01 },
++	{ 0x8530, 0x00 },
++	{ 0x8540, 0x00 },
++	{ 0x8801, 0x02 },
++	{ 0x8440, 0x00 },
++	{ 0xc4d0, 0x00 },
++	{ 0xb050, 0x00 },
++	{ 0x7033, 0x0c },	/* DCMCC */
++	{ 0x7444, 0x0a },	/* DCTRIP */
++	{ 0x7534, 0x06 },	/* DCTRIP2 */
++	{ 0x7584, 0x10 },	/* DCTRIPT */
++	{ 0x7635, 0x1e },	/* DCVOF */
++	{ 0x7695, 0x3f },	/* DCVOS */
++};
++
++/* Profile "speaker" (up to the dscDefault marker). */
++static const struct bf_val cnt_prof_speaker[] = {
++	{ BF_DCA,	0x01 },
++	{ BF_DCIE,	0x01 },
++	{ BF_LPM1MODE,	0x02 },
++	{ BF_LNMODE,	0x00 },
++	{ BF_AUDFS,	0x08 },	/* 48 kHz */
++};
++
++/*
++ * Speaker volume: AMPGAIN as an ALSA control in dB. Measured (tone through the speaker,
++ * recorded with the built-in microphone): the output amplitude is proportional to
++ * the AMPGAIN value (linear in voltage). The vendor 0xbe = 190 is full scale.
++ * The control is logarithmic: index 0 = silence, indices 1..56 = from -45.5 to -18 dB
++ * relative to the vendor maximum in 0.5 dB steps. CEILING -18 dB (verified by
++ * ear: above it the speaker rasps); the control will not go higher.
++ */
++#define TFA_VOL_MAX	56	/* ceiling index (-18 dB) */
++#define TFA_VOL_DEFAULT	32	/* -30 dB: a conservative start */
++
++/* gain[i] = round(190 * 10^(((i - 56) * 0.5 - 18) / 20)), gain[0] = 0 */
++static const u8 tfa9874_vol_gain[TFA_VOL_MAX + 1] = {
++	0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2,
++	2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 5,
++	5, 5, 5, 6, 6, 6, 7, 7, 8, 8, 8, 9, 10, 10,
++	11, 11, 12, 13, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23,
++	24,
++};
++
++/* ---- start/stop ---------------------------------------------------------- */
++
++static int tfa_write_table(struct tfa9874 *t, const struct reg_val *tbl, int n)
++{
++	int i, ret;
++
++	for (i = 0; i < n; i++) {
++		ret = regmap_write(t->regmap, tbl[i].reg, tbl[i].val);
++		if (ret)
++			return ret;
++	}
++	return 0;
++}
++
++static int tfa_write_bfs(struct tfa9874 *t, const struct bf_val *tbl, int n)
++{
++	int i, ret;
++
++	for (i = 0; i < n; i++) {
++		ret = tfa_bf_set(t, tbl[i].bf, tbl[i].val);
++		if (ret)
++			return ret;
++	}
++	return 0;
++}
++
++/* Everything the vendor does before leaving powerdown (tfaRunStartup up to INIT_CF). */
++static int tfa9874_configure(struct tfa9874 *t)
++{
++	unsigned int v, rev;
++	int ret;
++
++	/* tfa98xx_init(): reset the i2c registers to defaults (write the whole register) */
++	ret = regmap_write(t->regmap, BF_REG(BF_I2CR), 1U << BF_POS(BF_I2CR));
++	if (ret)
++		return ret;
++	usleep_range(1000, 2000);
++
++	/* tfa9874_specific(): keys */
++	ret = regmap_write(t->regmap, TFA_REG_KEYS, 0x5a6b);
++	if (ret)
++		return ret;
++	ret = regmap_read(t->regmap, TFA_REG_KEY1_RB, &v);
++	if (ret)
++		return ret;
++	regmap_write(t->regmap, TFA_REG_KEY1, v ^ 0x005a);
++	/* tfa98xx_key2(unlock) */
++	regmap_write(t->regmap, TFA_REG_KEYS, 0x5a6b);
++	regmap_write(t->regmap, TFA_REG_KEY2, 0x005a);
++	regmap_write(t->regmap, TFA_REG_KEYS, 0);
++
++	ret = tfa_bf_get(t, BF_REV, &rev);
++	if (ret)
++		return ret;
++	t->rev = rev;
++
++	switch (rev) {
++	case 0x0a74:
++		ret = tfa_write_table(t, rev_0a74, ARRAY_SIZE(rev_0a74));
++		break;
++	case 0x0b74:
++		ret = tfa_write_table(t, rev_0b74, ARRAY_SIZE(rev_0b74));
++		break;
++	case 0x0c74:
++		ret = tfa_write_table(t, rev_0c74, ARRAY_SIZE(rev_0c74));
++		break;
++	default:
++		dev_warn(t->dev, "unknown revision 0x%04x: optimal settings not applied\n",
++			 rev);
++		return -ENODEV;
++	}
++	if (ret)
++		return ret;
++
++	/* container: device */
++	ret = tfa_write_table(t, cnt_dev_regs, ARRAY_SIZE(cnt_dev_regs));
++	if (ret)
++		return ret;
++	ret = tfa_write_bfs(t, cnt_dev_bfs, ARRAY_SIZE(cnt_dev_bfs));
++	if (ret)
++		return ret;
++	/* container: speaker profile */
++	ret = tfa_write_bfs(t, cnt_prof_speaker, ARRAY_SIZE(cnt_prof_speaker));
++	if (ret)
++		return ret;
++	/* gain - what the user set (the container writes 0xbe) */
++	return tfa_bf_set(t, BF_AMPGAIN, tfa9874_vol_gain[t->vol]);
++}
++
++static void tfa9874_dump_status(struct tfa9874 *t, const char *when)
++{
++	unsigned int s0 = 0, s1 = 0, st = 0;
++
++	regmap_read(t->regmap, 0x10, &s0);
++	regmap_read(t->regmap, 0x11, &s1);
++	tfa_bf_get(t, BF_MANSTATE, &st);
++	/* 0x10 (tfa2 family): b0 VDDS b1 DCOCPOK b2 OTDS b3 OCDS b4 UVDS b5 MANALARM b6 TDMERR b7 NOCLK.
++	 * OK = 1 for VDDS/DCOCPOK/OTDS/UVDS (vendor: if (!UVDS || !OTDS ...) error); faults = 1 for OCDS/MANALARM/TDMERR/NOCLK.
++	 * 0x11: b6 PLLS b7 CLKS b13 SWS b14 AMPS. Only faults are printed. */
++	dev_info(t->dev, "%s: STATUS 0x10=%04x 0x11=%04x MANSTATE=%u%s%s%s%s%s%s%s%s\n",
++		 when, s0, s1, st,
++		 !(s0 & BIT(2)) ? " OVERHEAT" : "", !(s0 & BIT(4)) ? " SUPPLY-DROP" : "",
++		 (s0 & BIT(3)) ? " OCP" : "", (s0 & BIT(5)) ? " MANALARM" : "",
++		 (s0 & BIT(6)) ? " TDMERR" : "", (s0 & BIT(7)) ? " NOCLK" : "",
++		 !(s1 & BIT(7)) ? " no-CLKS" : "", (s1 & BIT(14)) ? "" : " amp-off");
++}
++
++/* ---- protection: status watchdog -----------------------------------------
++ * While the amplifier is on, read the STATUS flags (0x10/0x11) every 100 ms.
++ * In the tfa2 family a one = NORMAL for DCOCPOK(b1)/OTDS(b2)/UVDS(b4), and faults are a one
++ * for OCDS(b3)/MANALARM(b5)/TDMERR(b6)/NOCLK(b7). The chip hardware protection acts by itself;
++ * the watchdog adds supervision: on a fault (2 bad polls in a row) it switches the amplifier off,
++ * counts the failures, keeps a 3 s pause, and on 3 faults within 60 s it LATCHES the amplifier
++ * (it will not turn on until reset: echo reset > /sys/kernel/debug/tfa9874-fault).
++ * A lost clock (soft) just switches the amplifier off without counting a fault.
++ */
++#define TFA_MON_MS		100
++#define TFA_FAULT_COOLDOWN_MS	3000
++#define TFA_FAULT_WINDOW_MS	60000
++
++static void tfa9874_power_down(struct tfa9874 *t);
++
++/* called under t->lock */
++static void tfa9874_fault(struct tfa9874 *t, bool hard, unsigned int s0, unsigned int s1,
++			  const char *why)
++{
++	unsigned long now = jiffies;
++
++	tfa9874_power_down(t);
++	if (!hard) {
++		dev_warn(t->dev, "PROTECTION: %s (STATUS 0x10=%04x 0x11=%04x), amplifier off\n",
++			 why, s0, s1);
++		return;
++	}
++
++	t->fault_count++;
++	t->fault_t[t->fault_idx % 3] = now;
++	t->fault_idx++;
++	/* three faults in a row within the window - latch */
++	if (t->fault_idx >= 3 &&
++	    time_before(now, t->fault_t[t->fault_idx % 3] +
++				     msecs_to_jiffies(TFA_FAULT_WINDOW_MS)))
++		t->latched = true;
++	t->cooldown_until = now + msecs_to_jiffies(TFA_FAULT_COOLDOWN_MS);
++
++	if (!t->latched)
++		schedule_delayed_work(&t->retry, msecs_to_jiffies(TFA_FAULT_COOLDOWN_MS + 100));
++
++	dev_err(t->dev, "PROTECTION: FAULT #%u: %s (STATUS 0x10=%04x 0x11=%04x), amplifier off%s\n",
++		t->fault_count, why, s0, s1,
++		t->latched ? "; LATCH: 3 faults within 60 s, speaker sound blocked until reset" :
++			     "; restart in 3 s");
++}
++
++static int tfa9874_power_up(struct tfa9874 *t);
++
++static void tfa9874_retry(struct work_struct *w)
++{
++	struct tfa9874 *t = container_of(to_delayed_work(w), struct tfa9874, retry);
++
++	mutex_lock(&t->lock);
++	if (t->want_on && !t->powered && !t->latched && allow_amp) {
++		dev_info(t->dev, "PROTECTION: pause is over, trying to start the amplifier again\n");
++		if (tfa9874_power_up(t) == -EBUSY)
++			schedule_delayed_work(&t->retry, HZ);
++	}
++	mutex_unlock(&t->lock);
++}
++
++static void tfa9874_monitor(struct work_struct *w)
++{
++	struct tfa9874 *t = container_of(to_delayed_work(w), struct tfa9874, mon);
++	unsigned int s0 = 0, s1 = 0;
++	bool hard, soft;
++
++	mutex_lock(&t->lock);
++	if (!t->powered)
++		goto out;
++
++	if (regmap_read(t->regmap, 0x10, &s0) || regmap_read(t->regmap, 0x11, &s1)) {
++		if (++t->bad_i2c >= 3) {
++			tfa9874_fault(t, true, 0, 0, "no i2c communication with the amplifier");
++			goto out;
++		}
++		goto resched;
++	}
++	t->bad_i2c = 0;
++
++	hard = (s0 & 0x16) != 0x16 || (s0 & (BIT(3) | BIT(5) | BIT(6)));
++	soft = (s0 & BIT(7)) || !(s1 & BIT(7));
++
++	if (hard) {
++		if (++t->bad_hard >= 2) {
++			tfa9874_fault(t, true, s0, s1,
++				      (s0 & BIT(3)) ? "overcurrent (OCP)" :
++				      !(s0 & BIT(2)) ? "OVERHEAT" :
++				      !(s0 & BIT(4)) ? "supply drop" :
++				      !(s0 & BIT(1)) ? "DC-DC overload" :
++				      (s0 & BIT(5)) ? "manual alarm" : "TDM error");
++			goto out;
++		}
++	} else {
++		t->bad_hard = 0;
++	}
++
++	if (!hard && soft) {
++		if (++t->bad_soft >= 3) {
++			tfa9874_fault(t, false, s0, s1, "I2S clock lost");
++			goto out;
++		}
++	} else {
++		t->bad_soft = 0;
++	}
++
++resched:
++	if (t->powered)
++		schedule_delayed_work(&t->mon, msecs_to_jiffies(TFA_MON_MS));
++out:
++	mutex_unlock(&t->lock);
++}
++
++static int tfa9874_power_up(struct tfa9874 *t)
++{
++	unsigned int clks = 0;
++	int ret, i;
++
++	if (t->latched) {
++		dev_err_ratelimited(t->dev, "amplifier blocked by the protection after faults (reset: echo reset > /sys/kernel/debug/tfa9874-fault)\n");
++		return -EIO;
++	}
++	if (time_before(jiffies, t->cooldown_until)) {
++		dev_warn_ratelimited(t->dev, "pause after a fault, not turning the amplifier on yet\n");
++		return -EBUSY;
++	}
++
++	ret = tfa9874_configure(t);
++	if (ret) {
++		dev_err(t->dev, "configuration failed: %d\n", ret);
++		return ret;
++	}
++
++	/* INIT_CF */
++	tfa_bf_set(t, BF_MANSCONF, 1);
++	tfa_bf_set(t, BF_PWDN, 0);
++
++	for (i = 0; i < 50; i++) {
++		tfa_bf_get(t, BF_CLKS, &clks);
++		if (clks)
++			break;
++		usleep_range(2000, 3000);
++	}
++	if (!clks) {
++		tfa9874_dump_status(t, "no CLKS (no BCK?)");
++		tfa_bf_set(t, BF_PWDN, 1);
++		return -ETIMEDOUT;
++	}
++
++	/* OPERATING: turn the amplifier on only when the clock is stable */
++	tfa_bf_set(t, BF_AMPE, 1);
++	usleep_range(5000, 6000);
++	t->powered = true;
++	t->bad_hard = t->bad_soft = t->bad_i2c = 0;
++	tfa9874_dump_status(t, "up+5ms");
++	msleep(100);
++	tfa9874_dump_status(t, "up+105ms");
++	schedule_delayed_work(&t->mon, msecs_to_jiffies(TFA_MON_MS));
++	return 0;
++}
++
++static void tfa9874_power_down(struct tfa9874 *t)
++{
++	cancel_delayed_work(&t->mon);
++	tfa9874_dump_status(t, "before stop");
++	/* amplifier first, then powerdown (the vendor does it the other way round, but this is safer) */
++	tfa_bf_set(t, BF_AMPE, 0);
++	tfa_bf_set(t, BF_PWDN, 1);
++	t->powered = false;
++}
++
++/* ---- ASoC --------------------------------------------------------------- */
++
++static int tfa9874_amp_event(struct snd_soc_dapm_widget *w,
++			     struct snd_kcontrol *kcontrol, int event)
++{
++	struct snd_soc_component *c = snd_soc_dapm_to_component(w->dapm);
++	struct tfa9874 *t = snd_soc_component_get_drvdata(c);
++
++	mutex_lock(&t->lock);
++	switch (event) {
++	case SND_SOC_DAPM_POST_PMU:
++		t->want_on = true;
++		if (!allow_amp) {
++			dev_info(t->dev, "there is a stream to the speaker, but allow_amp=0: not turning the amplifier on\n");
++			break;
++		}
++		if (!t->powered && tfa9874_power_up(t))
++			dev_err(t->dev, "amplifier not started, the speaker stays silent\n");
++		break;
++	case SND_SOC_DAPM_PRE_PMD:
++		t->want_on = false;
++		cancel_delayed_work(&t->retry);
++		if (t->powered)
++			tfa9874_power_down(t);
++		break;
++	}
++	mutex_unlock(&t->lock);
++
++	return 0;	/* do not propagate the error: see the file header */
++}
++
++/* ---- volume: AMPGAIN as an ALSA control in dB -----------------------------
++ * Measured (tone through the speaker, recorded with the built-in microphone): the output
++ * amplitude is proportional to the AMPGAIN value (linear in voltage, not in dB).
++ * The vendor value 0xbe = 190 is full scale. The control is logarithmic:
++ * index 0 = silence, indices 1..96 = from -66 to -18 dB relative to the vendor
++ * maximum in 0.5 dB steps. CEILING = -18 dB (verified by ear: above it the speaker
++ * rasps) - the control will not go higher.
++ */
++static int tfa9874_gain_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uc)
++{
++	struct tfa9874 *t = snd_soc_component_get_drvdata(snd_soc_kcontrol_component(kctl));
++
++	uc->value.integer.value[0] = t->vol;
++	return 0;
++}
++
++static int tfa9874_gain_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uc)
++{
++	struct tfa9874 *t = snd_soc_component_get_drvdata(snd_soc_kcontrol_component(kctl));
++	long val = uc->value.integer.value[0];
++	bool changed;
++
++	if (val < 0 || val > TFA_VOL_MAX)
++		return -EINVAL;
++	mutex_lock(&t->lock);
++	changed = val != t->vol;
++	t->vol = val;
++	if (t->powered)
++		tfa_bf_set(t, BF_AMPGAIN, tfa9874_vol_gain[t->vol]);
++	mutex_unlock(&t->lock);
++	return changed;
++}
++
++/* shown relative to the vendor maximum: min -46 dB, step 0.5 dB, ceiling -18 dB */
++DECLARE_TLV_DB_SCALE(tfa9874_gain_tlv, -4600, 50, 1);
++
++static const struct snd_kcontrol_new tfa9874_controls[] = {
++	SOC_SINGLE_EXT_TLV("Speaker Volume", SND_SOC_NOPM, 0, TFA_VOL_MAX, 0,
++			   tfa9874_gain_get, tfa9874_gain_put, tfa9874_gain_tlv),
++};
++
++static int tfa9874_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
++{
++	/* the SoC provides the I2S clocks, I2S format, no inversions (container: TDM 2x32) */
++	if ((fmt & SND_SOC_DAIFMT_FORMAT_MASK) != SND_SOC_DAIFMT_I2S ||
++	    (fmt & SND_SOC_DAIFMT_CLOCK_PROVIDER_MASK) != SND_SOC_DAIFMT_CBC_CFC ||
++	    (fmt & SND_SOC_DAIFMT_INV_MASK) != SND_SOC_DAIFMT_NB_NF)
++		return -EINVAL;
++	return 0;
++}
++
++static int tfa9874_hw_params(struct snd_pcm_substream *substream,
++			     struct snd_pcm_hw_params *params,
++			     struct snd_soc_dai *dai)
++{
++	/* the container slot is 32 bits: the SoC must send 32-bit slots */
++	if (params_width(params) != 32 && params_physical_width(params) != 32)
++		return -EINVAL;
++	return 0;
++}
++
++static const struct snd_soc_dai_ops tfa9874_dai_ops = {
++	.set_fmt = tfa9874_set_fmt,
++	.hw_params = tfa9874_hw_params,
++};
++
++static struct snd_soc_dai_driver tfa9874_dai = {
++	.name = "tfa9874-aif",
++	.playback = {
++		.stream_name = "Speaker Playback",
++		.channels_min = 1,
++		.channels_max = 2,
++		.rates = SNDRV_PCM_RATE_48000,
++		.formats = SNDRV_PCM_FMTBIT_S32_LE,
++	},
++	.ops = &tfa9874_dai_ops,
++};
++
++static const struct snd_soc_dapm_widget tfa9874_widgets[] = {
++	SND_SOC_DAPM_OUT_DRV_E("Speaker Amp", SND_SOC_NOPM, 0, 0, NULL, 0,
++			       tfa9874_amp_event,
++			       SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
++	SND_SOC_DAPM_OUTPUT("Speaker Out"),
++};
++
++static const struct snd_soc_dapm_route tfa9874_routes[] = {
++	{ "Speaker Amp", NULL, "Speaker Playback" },
++	{ "Speaker Out", NULL, "Speaker Amp" },
++};
++
++static const struct snd_soc_component_driver tfa9874_component = {
++	.controls		= tfa9874_controls,
++	.num_controls		= ARRAY_SIZE(tfa9874_controls),
++	.dapm_widgets		= tfa9874_widgets,
++	.num_dapm_widgets	= ARRAY_SIZE(tfa9874_widgets),
++	.dapm_routes		= tfa9874_routes,
++	.num_dapm_routes	= ARRAY_SIZE(tfa9874_routes),
++};
++
++/* debugfs: /sys/kernel/debug/tfa9874-status - register snapshot (to analyse distortion/clipping at volume) */
++static int tfa9874_status_show(struct seq_file *m, void *unused)
++{
++	struct tfa9874 *t = m->private;
++	unsigned int v, r;
++
++	mutex_lock(&t->lock);
++	seq_printf(m, "powered=%d REV=0x%04x vol_idx=%u faults=%u latched=%d\n", t->powered, t->rev, t->vol,
++		   t->fault_count, t->latched);
++	for (r = 0x00; r <= 0x14; r++) {
++		if (regmap_read(t->regmap, r, &v))
++			continue;
++		seq_printf(m, "reg%02x=%04x ", r, v);
++	}
++	seq_puts(m, "\n");
++	for (r = 0x50; r <= 0x53; r++) {
++		if (regmap_read(t->regmap, r, &v))
++			continue;
++		seq_printf(m, "reg%02x=%04x ", r, v);
++	}
++	seq_puts(m, "\n");
++	if (!regmap_read(t->regmap, 0x13, &v))
++		seq_printf(m, "CLIPS=%u OVDS=%u OCPO(AP,AN,BP,BN)=%u%u%u%u\n",
++			   !!(v & BIT(9)), !!(v & BIT(8)),
++			   !!(v & BIT(0)), !!(v & BIT(1)), !!(v & BIT(2)), !!(v & BIT(3)));
++	mutex_unlock(&t->lock);
++	return 0;
++}
++DEFINE_SHOW_ATTRIBUTE(tfa9874_status);
++
++/* debugfs /sys/kernel/debug/tfa9874-fault: "reset" - clear the latch, "inject" - simulate a fault (protection check) */
++static ssize_t tfa9874_fault_write(struct file *f, const char __user *ubuf, size_t len, loff_t *off)
++{
++	struct tfa9874 *t = f->private_data;
++	char buf[16] = {};
++
++	if (copy_from_user(buf, ubuf, min(len, sizeof(buf) - 1)))
++		return -EFAULT;
++	mutex_lock(&t->lock);
++	if (!strncmp(buf, "reset", 5)) {
++		t->latched = false;
++		t->fault_count = 0;
++		t->fault_idx = 0;
++		t->cooldown_until = jiffies;
++		dev_info(t->dev, "protection reset\n");
++	} else if (!strncmp(buf, "inject", 6)) {
++		if (t->powered)
++			tfa9874_fault(t, true, 0xdead, 0xdead, "TEST: simulated fault");
++		else
++			dev_info(t->dev, "inject: the amplifier is off, nothing to bring down\n");
++	}
++	mutex_unlock(&t->lock);
++	return len;
++}
++
++static const struct file_operations tfa9874_fault_fops = {
++	.owner = THIS_MODULE,
++	.open = simple_open,
++	.write = tfa9874_fault_write,
++};
++
++static int tfa9874_probe(struct i2c_client *client)
++{
++	struct device *dev = &client->dev;
++	struct tfa9874 *t;
++	unsigned int rev;
++	int ret;
++
++	t = devm_kzalloc(dev, sizeof(*t), GFP_KERNEL);
++	if (!t)
++		return -ENOMEM;
++	t->dev = dev;
++	mutex_init(&t->lock);
++	INIT_DELAYED_WORK(&t->mon, tfa9874_monitor);
++	INIT_DELAYED_WORK(&t->retry, tfa9874_retry);
++	t->vol = TFA_VOL_DEFAULT;
++
++	t->regmap = devm_regmap_init_i2c(client, &tfa9874_regmap);
++	if (IS_ERR(t->regmap))
++		return PTR_ERR(t->regmap);
++
++	/* vendor: reset-gpio is active HIGH: 1 (10 ms) -> 0 (10 ms) */
++	t->reset = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_HIGH);
++	if (IS_ERR(t->reset))
++		return dev_err_probe(dev, PTR_ERR(t->reset), "reset gpio\n");
++	if (t->reset) {
++		usleep_range(10000, 11000);
++		gpiod_set_value_cansleep(t->reset, 0);
++		usleep_range(10000, 11000);
++	}
++
++	ret = tfa_bf_get(t, BF_REV, &rev);
++	if (ret)
++		return dev_err_probe(dev, ret, "cannot read REV (no answer on i2c)\n");
++	if ((rev & 0xff) != TFA9874_FAMILY_ID)
++		return dev_err_probe(dev, -ENODEV, "this is not a TFA9874: REV=0x%04x\n", rev);
++	t->rev = rev;
++
++	/* keep it in powerdown until a stream starts */
++	tfa_bf_set(t, BF_AMPE, 0);
++	tfa_bf_set(t, BF_PWDN, 1);
++
++	dev_info(dev, "TFA9874 found, REV=0x%04x\n", rev);
++	t->dbg = debugfs_create_file("tfa9874-status", 0444, NULL, t, &tfa9874_status_fops);
++	t->dbg_fault = debugfs_create_file("tfa9874-fault", 0200, NULL, t, &tfa9874_fault_fops);
++	dev_set_drvdata(dev, t);	/* snd_soc_component_get_drvdata() takes the same one */
++
++	return devm_snd_soc_register_component(dev, &tfa9874_component,
++					       &tfa9874_dai, 1);
++}
++
++static void tfa9874_remove(struct i2c_client *client)
++{
++	struct tfa9874 *t = dev_get_drvdata(&client->dev);
++
++	if (t) {
++		debugfs_remove(t->dbg);
++		debugfs_remove(t->dbg_fault);
++		cancel_delayed_work_sync(&t->mon);
++		cancel_delayed_work_sync(&t->retry);
++	}
++	if (t && t->powered)
++		tfa9874_power_down(t);
++}
++
++static const struct of_device_id tfa9874_of_match[] = {
++	{ .compatible = "nxp,tfa9874" },
++	{}
++};
++MODULE_DEVICE_TABLE(of, tfa9874_of_match);
++
++static const struct i2c_device_id tfa9874_i2c_id[] = {
++	{ "tfa9874" },
++	{}
++};
++MODULE_DEVICE_TABLE(i2c, tfa9874_i2c_id);
++
++static struct i2c_driver tfa9874_driver = {
++	.driver = {
++		.name = "tfa9874",
++		.of_match_table = tfa9874_of_match,
++	},
++	.probe = tfa9874_probe,
++	.remove = tfa9874_remove,
++	.id_table = tfa9874_i2c_id,
++};
++module_i2c_driver(tfa9874_driver);
++
++MODULE_DESCRIPTION("NXP TFA9874 smart amplifier (no-DSP), Redmi Note 8 Pro");
++MODULE_LICENSE("GPL v2");

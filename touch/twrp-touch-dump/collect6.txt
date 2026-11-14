@@ -1,0 +1,55 @@
+=== ts_xsfer_state
+[NVT-ts-spi] used:1, tmp:0
+=== proc nvt*
+NVTSPI
+bootprof
+mtprintk
+mtprof
+nvt_baseline
+nvt_diff
+nvt_fw_version
+nvt_pocket_palm_switch
+nvt_raw
+nvt_selftest
+nvt_test_data
+nvt_xiaomi_config_info
+tp_lockdown_info
+tp_selftest
+ttpct
+--- /proc/nvt_fw_version
+fw_ver=27, x_num=18, y_num=36, button_num=0
+=== xiaomi_touch dt
+compatible =  78 69 61 6f 6d 69 2d 74 6f 75 63 68 00
+name =  78 69 61 6f 6d 69 5f 74 6f 75 63 68 00
+phandle =  00 00 01 47
+status =  6f 6b 00
+touch,name =  78 69 61 6f 6d 69 2d 74 6f 75 63 68 00
+=== vtp ldo node
+/mt6360_ldo_dts/ldo2
+  name = ldo2 
+  phandle =   R
+  regulator-always-on = 
+  regulator-compatible = LDO2 
+  regulator-default-on =    
+  regulator-max-microvolt =  6î€
+  regulator-min-microvolt =  O€
+  regulator-name = vtp 
+  status = okay 
+=== regulators vtp/vsp/vsn/lcm/ts
+ vtp                              0    0      0  3000mV     0mA  1200mV  3600mV 
+=== pinctrl pin 1,2,44,35-38 state
+pin 1 (GPIO1) 001: 0001001111
+pin 2 (GPIO2) 002: 0111001100
+pin 44 (GPIO44) 044: 0111000100
+pin 35 (GPIO35) 035: 5100000100
+pin 36 (GPIO36) 036: 5101000100
+pin 37 (GPIO37) 037: 5000000110
+pin 38 (GPIO38) 038: 5100000100
+=== pinconf for spi/ts pins
+pin 1 (GPIO1): ts_novatek pinctrl_paris:302 function func0 group GPIO1
+pin 2 (GPIO2): ts_novatek pinctrl_paris:303 function func0 group GPIO2
+pin 35 (GPIO35): (MUX UNCLAIMED) (GPIO UNCLAIMED)
+pin 36 (GPIO36): (MUX UNCLAIMED) (GPIO UNCLAIMED)
+pin 37 (GPIO37): (MUX UNCLAIMED) (GPIO UNCLAIMED)
+pin 38 (GPIO38): (MUX UNCLAIMED) (GPIO UNCLAIMED)
+pin 44 (GPIO44): (MUX UNCLAIMED) (GPIO UNCLAIMED)

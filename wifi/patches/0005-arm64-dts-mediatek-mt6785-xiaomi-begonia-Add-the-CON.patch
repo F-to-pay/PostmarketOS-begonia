@@ -1,0 +1,91 @@
+From 234465db1ad8bb65da28580ef12724da74291c9d Mon Sep 17 00:00:00 2001
+From: Begonia <begonia@localhost>
+Date: Thu, 12 Nov 2026 14:29:22 +0100
+Subject: [PATCH 05/10] arm64: dts: mediatek: mt6785-xiaomi-begonia: Add the
+ CONNSYS and WiFi nodes
+
+The combo chip (WiFi/Bluetooth/GPS) inside the SoC needs its register
+windows, power domain, clock, PMIC supplies and two reserved memory
+regions described. There is no mainline driver, the out-of-tree
+consys-bringup and gen4m modules bind to these nodes.
+---
+ .../boot/dts/mediatek/consys-begonia.dtsi     | 59 +++++++++++++++++++
+ .../dts/mediatek/mt6785-xiaomi-begonia.dts    |  2 +
+ 2 files changed, 61 insertions(+)
+ create mode 100755 arch/arm64/boot/dts/mediatek/consys-begonia.dtsi
+
+diff --git a/arch/arm64/boot/dts/mediatek/consys-begonia.dtsi b/arch/arm64/boot/dts/mediatek/consys-begonia.dtsi
+new file mode 100755
+index 000000000..8be35f159
+--- /dev/null
++++ b/arch/arm64/boot/dts/mediatek/consys-begonia.dtsi
+@@ -0,0 +1,59 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * CONNSYS (WiFi/Bluetooth/GPS combo chip inside the SoC) of the Xiaomi Redmi
++ * Note 8 Pro (begonia).
++ *
++ * There is no mainline driver; the out-of-tree consys-bringup/gen4m modules
++ * bind to these nodes. Register map and memory come from the vendor DT
++ * (mt6785.dts: consys@18002000, consys-reserve-memory, wifi@18000000).
++ */
++
++/ {
++	reserved-memory {
++		/* vendor: consys-reserve-memory, 4M, align 16M, 0x40000000..0xC0000000 */
++		consys_emi: consys-emi {
++			no-map;
++			size = <0 0x400000>;
++			alignment = <0 0x1000000>;
++			alloc-ranges = <0 0x40000000 0 0x80000000>;
++		};
++
++		/* vendor: wifi-reserve-memory, 3M, shared-dma-pool */
++		wifi_mem: wifi-reserve-memory {
++			compatible = "shared-dma-pool";
++			no-map;
++			size = <0 0x300000>;
++			alignment = <0 0x1000000>;
++			alloc-ranges = <0 0x40000000 0 0x80000000>;
++		};
++	};
++};
++
++&{/soc} {
++	consys: consys@18002000 {
++		compatible = "xiaomi,begonia-consys-bringup";
++		reg = <0 0x18002000 0 0x1000>,	/* CONN_MCU_CONFIG_BASE */
++		      <0 0x180b1000 0 0x1000>;	/* CONN_TOP_MISC_OFF_BASE */
++		reg-names = "mcu_cfg", "top_misc_off";
++
++		power-domains = <&spm MT6785_POWER_DOMAIN_CONN>;
++		clocks = <&infracfg CLK_INFRA_CCIF4_AP>;
++		clock-names = "ccif4";
++
++		vcn18-supply = <&mt6359_vcn18_ldo_reg>;
++		vcn33_1_wifi-supply = <&mt6359_vcn33_1_wifi_ldo_reg>;
++		vcn33_2_wifi-supply = <&mt6359_vcn33_2_wifi_ldo_reg>;
++
++		mediatek,pericfg = <&pericfg>;
++		mediatek,topckgen = <&topckgen>;
++		mediatek,pwrap = <&pwrap>;
++		memory-region = <&consys_emi>;
++	};
++
++	wifi@18000000 {
++		compatible = "mediatek,wifi";
++		reg = <0 0x18000000 0 0x100000>;
++		interrupts = <GIC_SPI 322 IRQ_TYPE_LEVEL_LOW>;
++		memory-region = <&wifi_mem>;
++	};
++};
+diff --git a/arch/arm64/boot/dts/mediatek/mt6785-xiaomi-begonia.dts b/arch/arm64/boot/dts/mediatek/mt6785-xiaomi-begonia.dts
+index ef7fbc846..a3fb89147 100755
+--- a/arch/arm64/boot/dts/mediatek/mt6785-xiaomi-begonia.dts
++++ b/arch/arm64/boot/dts/mediatek/mt6785-xiaomi-begonia.dts
+@@ -817,3 +817,5 @@ &xhci {
+ 	vusb33-supply = <&mt6359_vusb_ldo_reg>;
+ 	status = "okay";
+ };
++
++#include "consys-begonia.dtsi"

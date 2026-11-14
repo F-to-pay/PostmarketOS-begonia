@@ -1,0 +1,103 @@
+<!-- MHonArc v2.6.19 -->
+<!--X-Subject: Re: [PATCH 13/16] KVM: TDX: Add methods to ignore virtual apic related operation -->
+<!--X-From-R13: Pvaova Ih &#60;ovaova.jhNyvahk.vagry.pbz> -->
+<!--X-Date: Wed, 22 Jan 2025 09:01:30 &#45;0500 (EST) -->
+<!--X-Message-Id: 4f3752f0&#45;e940&#45;4f2f&#45;9606&#45;58fd2f019655@linux.intel.com -->
+<!--X-Content-Type: text/plain -->
+<!--X-Reference: 20241209010734.3543481&#45;1&#45;binbin.wu@linux.intel.com -->
+<!--X-Reference: 20241209010734.3543481&#45;14&#45;binbin.wu@linux.intel.com -->
+<!--X-Reference: CABgObfbFX+3rCcB2teTEMO=EPiuOnaXjMW+tR3UF5t7gWwiNwQ@mail.gmail.com -->
+<!--X-Head-End-->
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+                      "http://www.w3.org/TR/REC-html40/loose.dtd">
+<html lang=en>
+<head>
+<meta HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-2">
+<title>Linux-Kernel Archive: Re: [PATCH 13/16] KVM: TDX: Add methods to ignore virtual apic related operation</title>
+<meta NAME="Author" CONTENT="Binbin Wu &lt;binbin.wu@xxxxxxxxxxxxxxx&gt;">
+<meta NAME="Subject" CONTENT="Re: [PATCH 13/16] KVM: TDX: Add methods to ignore virtual apic related operation">
+</head> 
+<body BGCOLOR="#FFFFFF" TEXT="#000000">
+
+<!--X-Body-Begin-->
+<!--X-User-Header-->
+<!--X-User-Header-End-->
+<!--X-TopPNI-->
+
+
+<!--X-TopPNI-End-->
+<!--X-MsgBody-->
+<!--X-Subject-Header-Begin-->
+<h1>Re: [PATCH 13/16] KVM: TDX: Add methods to ignore virtual apic related operation</h1>
+<strong>From: </strong>Binbin Wu
+<br><strong>Date: </strong> Wed Jan 22 2025 - 09:01:30 EST
+<p>
+<ul>
+<li><strong>Next message: </strong> <a href="06550.html"> Jacopo Mondi: "Re: [PATCH v5 01/10] dt-bindings: media: Add amlogic,c3-mipi-csi2.yaml"</a>
+
+<li><strong>Previous message: </strong> <a href="06548.html"> Sudeep Holla: "Re: [PATCH 2/5] firmware: arm_scmi: imx: Add i.MX95 CPU Protocol"</a>
+
+<li><strong>In reply to: </strong> <a href="06367.html"> Paolo Bonzini: "Re: [PATCH 13/16] KVM: TDX: Add methods to ignore virtual apic related operation"</a>
+
+
+
+<li><strong>Messages sorted by: </strong><a href="date.html#06549">[ date ]</a> <a href="index.html#06549">[ thread ]</a> <a href="subject.html#06549">[ subject ]</a> <a href="author.html#06549">[ author ]</a>
+</ul>
+
+<!--X-Subject-Header-End-->
+<!--X-Head-of-Message-->
+<!--X-Head-of-Message-End-->
+<!--X-Head-Body-Sep-Begin-->
+<hr NOSHADE>
+<!--X-Head-Body-Sep-End-->
+<!--X-Body-of-Message-->
+
+<br>
+<br>
+<br>
+On 1/22/2025 7:34 PM, Paolo Bonzini wrote:<br>
+<blockquote style="border-left: #5555EE solid 0.2em; margin: 0em; padding-left: 0.85em">
+On Mon, Dec 9, 2024 at 2:06&#x202F;AM Binbin Wu &lt;binbin.wu@xxxxxxxxxxxxxxx&gt; wrote:<br>
+<blockquote style="border-left: #5555EE solid 0.2em; margin: 0em; padding-left: 0.85em">
+-       .hwapic_irr_update = vmx_hwapic_irr_update,<br>
+-       .hwapic_isr_update = vmx_hwapic_isr_update,<br>
++       .hwapic_irr_update = vt_hwapic_irr_update,<br>
++       .hwapic_isr_update = vt_hwapic_isr_update,<br>
+</blockquote>
+Just a note, hwapic_irr_update is gone in 6.14 and thus in kvm-coco-queue.<br>
+<br>
+Paolo<br>
+<br>
+</blockquote>
+Thanks for the info.<br>
+<br>
+<br>
+
+<!--X-Body-of-Message-End-->
+<!--X-MsgBody-End-->
+<!--X-Follow-Ups-->
+<hr NOSHADE>
+<!--X-Follow-Ups-End-->
+<!--X-References-->
+
+
+
+<!--X-References-End-->
+<!--X-BotPNI-->
+<ul>
+<li><strong>Next message: </strong> <a href="06550.html"> Jacopo Mondi: "Re: [PATCH v5 01/10] dt-bindings: media: Add amlogic,c3-mipi-csi2.yaml"</a>
+
+<li><strong>Previous message: </strong> <a href="06548.html"> Sudeep Holla: "Re: [PATCH 2/5] firmware: arm_scmi: imx: Add i.MX95 CPU Protocol"</a>
+
+<li><strong>In reply to: </strong> <a href="06367.html"> Paolo Bonzini: "Re: [PATCH 13/16] KVM: TDX: Add methods to ignore virtual apic related operation"</a>
+
+
+
+<li><strong>Messages sorted by: </strong><a href="date.html#06549">[ date ]</a> <a href="index.html#06549">[ thread ]</a> <a href="subject.html#06549">[ subject ]</a> <a href="author.html#06549">[ author ]</a>
+</ul>
+
+<!--X-BotPNI-End-->
+<!--X-User-Footer-->
+<!--X-User-Footer-End-->
+</body>
+</html>

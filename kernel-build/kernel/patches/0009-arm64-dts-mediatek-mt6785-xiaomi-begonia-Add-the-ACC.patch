@@ -1,0 +1,53 @@
+From e964ae19a921120f6434d93fa1b3a84e4845b861 Mon Sep 17 00:00:00 2001
+From: Begonia <begonia@localhost>
+Date: Thu, 12 Nov 2026 21:47:26 +0100
+Subject: [PATCH 09/18] arm64: dts: mediatek: mt6785-xiaomi-begonia: Add the
+ ACCDET headset detection node
+
+The MT6359 PMIC accessory detection (3.5 mm jack) child node with the
+timing/threshold values of the sibling MediaTek platforms, and the
+mediatek,accdet link from the sound card.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ .../boot/dts/mediatek/audio-begonia.dtsi      | 20 +++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/mediatek/audio-begonia.dtsi b/arch/arm64/boot/dts/mediatek/audio-begonia.dtsi
+index f9c42d4b3..697bb43a6 100644
+--- a/arch/arm64/boot/dts/mediatek/audio-begonia.dtsi
++++ b/arch/arm64/boot/dts/mediatek/audio-begonia.dtsi
+@@ -230,6 +230,25 @@ pins-i2s3 {
+ 	};
+ };
+ 
++/*
++ * 3.5 mm jack detection: ACCDET inside the MT6359 PMIC. The node must be named "accdet" and be a child of the PMIC
++ * (the driver looks it up by name at the parent); compatible is needed for the mt6359-accdet MFD cell. The values are as on
++ * related MediaTek boards (k6853/k6873/k6875): bias 2.8 V, mode 2 (low cost without internal bias).
++ */
++&pmic {
++	accdet: accdet {
++		compatible = "mediatek,mt6359-accdet";
++		mediatek,mic-vol = <8>;
++		mediatek,plugout-debounce = <1>;
++		mediatek,mic-mode = <2>;
++		mediatek,pwm-deb-setting = <0x500 0x500 1 0x1f0
++					    0x800 0x800 0x20 0x44
++					    0x4 0x1
++					    0x5 0x3 0x3 0x5 0xe>;
++		mediatek,three-key-thr = <0 80 220 400>;
++	};
++};
++
+ &i2c6 {
+ 	clock-frequency = <400000>;
+ 	pinctrl-names = "default";
+@@ -251,6 +270,7 @@ sound: sound {
+ 		compatible = "mediatek,mt6785_mt6359";
+ 		model = "mt6785_mt6359";
+ 		mediatek,platform = <&afe>;
++		mediatek,accdet = <&accdet>;
+ 
+ 		pinctrl-names = "aud_clk_mosi_off", "aud_clk_mosi_on",
+ 				"aud_dat_mosi_off", "aud_dat_mosi_on",

@@ -1,0 +1,38 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * EXPERIMENTAL: MD1 (modem) bring-up node for Xiaomi Redmi Note 8 Pro (begonia).
+ *
+ * Power resources only: the vmodem / vsram_md regulators and the MD MTCMOS domain.
+ * The modem does NOT start by itself: the md-bringup driver does it in stages
+ * (module param stage), with a rollback when the module is unloaded. The labels mdvmodem / mdvsram
+ * are placed by make-md-dtb.sh (the finished DTB does not have them).
+ */
+
+#include <dt-bindings/power/mediatek,mt6785-power.h>
+#include <dt-bindings/clock/mediatek,mt6785-clk.h>
+
+&{/soc} {
+	md_bringup: md-bringup {
+		compatible = "xiaomi,begonia-md-bringup";
+		/* TWO domains on purpose: with one the kernel powers it on at bind, BEFORE the regulators
+		 * (ext buck iso -> no ack). The second one (conn, already on) disables the automatic attach;
+		 * the driver attaches the md domain itself (dev_pm_domain_attach_by_name) after vmodem/vsram_md. */
+		power-domains = <&spm MT6785_POWER_DOMAIN_MD>, <&spm MT6785_POWER_DOMAIN_CONN>;
+		power-domain-names = "md", "conn";
+		/* like the vendor clk_table[1..8]: dpmaif + CCIF AP/MD 0,1,2 and ccif4_md (dpmaif - at the HIF init) */
+		clocks = <&mdinfra CLK_INFRA_CCIF_AP>, <&mdinfra CLK_INFRA_CCIF_MD>,
+			 <&mdinfra CLK_INFRA_CCIF1_AP>, <&mdinfra CLK_INFRA_CCIF1_MD>,
+			 <&mdinfra CLK_INFRA_CCIF2_AP>, <&mdinfra CLK_INFRA_CCIF2_MD>,
+			 <&mdinfra CLK_INFRA_CCIF4_MD>,
+			 <&mdinfra CLK_INFRA_DPMAIF>;
+		vmodem-supply = <&mdvmodem>;
+		vsram_md-supply = <&mdvsram>;
+		/* radio path power (MD does not turn it on itself - LK keeps it, mainline switches it off): */
+		vrf12-supply = <&mdvrf12>;
+		vrf18-supply = <&mdvrf18>;
+		vrfck-supply = <&mdvrfck>;
+		vbbck-supply = <&mdvbbck>;
+		vpa-supply = <&mdvpa>;
+		va09-supply = <&mdva09>;
+	};
+};

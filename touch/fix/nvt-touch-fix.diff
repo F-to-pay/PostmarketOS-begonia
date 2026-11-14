@@ -1,0 +1,167 @@
+diff --git a/drivers/input/touchscreen/novatek-nvt-ts-core.c b/drivers/input/touchscreen/novatek-nvt-ts-core.c
+--- a/drivers/input/touchscreen/novatek-nvt-ts-core.c
++++ b/drivers/input/touchscreen/novatek-nvt-ts-core.c
+@@ -216,6 +216,7 @@
+ 		 nvt_ts_upload_firmware_impl upload_firmware)
+ {
+ 	int error, width, height, irq_type;
++	unsigned long irq_flags;
+ 	struct nvt_ts_data *data;
+ 	const struct nvt_ts_chip_data *chip;
+ 	struct input_dev *input;
+@@ -321,9 +322,18 @@
+ 	data->input = input;
+ 	input_set_drvdata(input, data);
+ 
++	/*
++	 * The IRQ trigger type from the firmware parameters is not reliable,
++	 * e.g. Redmi Note 8 Pro reports "falling" but the interrupt line is
++	 * wired (and described) as rising edge, which is also what the
++	 * downstream driver uses. Prefer the trigger type from firmware/DT.
++	 */
++	irq_flags = irq_get_trigger_type(irq);
++	if (!irq_flags)
++		irq_flags = nvt_ts_irq_type[irq_type];
++
+ 	error = devm_request_threaded_irq(dev, irq, NULL, nvt_ts_irq,
+-					  IRQF_ONESHOT | IRQF_NO_AUTOEN |
+-						nvt_ts_irq_type[irq_type],
++					  IRQF_ONESHOT | IRQF_NO_AUTOEN | irq_flags,
+ 					  dev_name(dev), data);
+ 	if (error)
+ 		return dev_err_probe(dev, error, "failed to request irq\n");
+diff --git a/drivers/input/touchscreen/novatek-nvt-ts-spi.c b/drivers/input/touchscreen/novatek-nvt-ts-spi.c
+--- a/drivers/input/touchscreen/novatek-nvt-ts-spi.c
++++ b/drivers/input/touchscreen/novatek-nvt-ts-spi.c
+@@ -284,8 +284,15 @@
+ 	return 0;
+ }
+ 
+-static int nvt_ts_spi_xfer(struct spi_device *spi, u32 page_addr, u8 cmd,
+-			   struct spi_transfer *xfers, size_t num_xfers)
++struct nvt_ts_spi {
++	struct spi_device *spi;
++	/* Page currently selected in the controller, 0 if unknown */
++	u32 page;
++};
++
++static int nvt_ts_spi_xfer(struct nvt_ts_spi *ts, u32 page_addr, u8 cmd,
++			   struct spi_transfer *xfers, size_t num_xfers,
++			   bool skip_page)
+ {
+ 	struct spi_transfer cmd_xfer = { .tx_buf = &cmd, .len = 1 };
+ 	struct spi_message msg;
+@@ -299,20 +306,24 @@
+ 
+ 	spi_message_init(&msg);
+ 
+-	if (page_addr)
++	if (page_addr && !(skip_page && page_addr == ts->page)) {
+ 		spi_message_add_tail(&page_xfer, &msg);
++		ts->page = page_addr;
++	} else if (!page_addr) {
++		ts->page = 0;
++	}
+ 
+ 	spi_message_add_tail(&cmd_xfer, &msg);
+ 
+ 	for (int i = 0; i < num_xfers; i++)
+ 		spi_message_add_tail(&xfers[i], &msg);
+ 
+-	return spi_sync(spi, &msg);
++	return spi_sync(ts->spi, &msg);
+ }
+ 
+-static int nvt_ts_spi_reg_xfer(struct spi_device *spi, const void *reg_buf,
++static int nvt_ts_spi_reg_xfer(struct nvt_ts_spi *ts, const void *reg_buf,
+ 			       bool write, struct spi_transfer *xfers,
+-			       size_t num_xfers)
++			       size_t num_xfers, bool skip_page)
+ {
+ 	u32 reg = *(u32 *)reg_buf;
+ 	u32 page_addr = reg >> 7;
+@@ -321,13 +332,14 @@
+ 	if (write)
+ 		cmd |= BIT(7);
+ 
+-	return nvt_ts_spi_xfer(spi, page_addr, cmd, xfers, num_xfers);
++	return nvt_ts_spi_xfer(ts, page_addr, cmd, xfers, num_xfers, skip_page);
+ }
+ 
+ static int nvt_ts_spi_read(void *context, const void *reg_buf, size_t reg_size,
+ 			   void *val_buf, size_t val_size)
+ {
+-	struct spi_device *spi = to_spi_device(context);
++	struct nvt_ts_spi *ts = context;
++	bool skip_page = true;
+ 	u8 status;
+ 	int ret;
+ 
+@@ -336,13 +348,28 @@
+ 		{ .rx_buf = val_buf, .len = val_size },
+ 	};
+ 
+-	ret = nvt_ts_spi_reg_xfer(spi, reg_buf, false, xfers,
+-				  ARRAY_SIZE(xfers));
++	/*
++	 * The controller keeps the selected page across transfers and the
++	 * downstream driver does not re-select it for every touch report.
++	 * Sending the page select in front of each read of the touch event
++	 * buffer makes the controller return its idle stream instead of the
++	 * touch data, so only select the page when it is not already selected.
++	 * Retry with an explicit page select if the controller did not accept
++	 * the read, in case the selected page was lost (e.g. after a reset).
++	 */
++retry:
++	ret = nvt_ts_spi_reg_xfer(ts, reg_buf, false, xfers,
++				  ARRAY_SIZE(xfers), skip_page);
+ 	if (ret)
+ 		return ret;
+ 
++	if (status != 0xff && skip_page) {
++		skip_page = false;
++		goto retry;
++	}
++
+ 	if (status != 0xff) {
+-		dev_err(&spi->dev, "read failed, status: 0x%02x\n", status);
++		dev_err(&ts->spi->dev, "read failed, status: 0x%02x\n", status);
+ 		return -EIO;
+ 	}
+ 
+@@ -351,14 +378,14 @@
+ 
+ static int nvt_ts_spi_write(void *context, const void *data, size_t count)
+ {
+-	struct spi_device *spi = to_spi_device(context);
++	struct nvt_ts_spi *ts = context;
+ 
+ 	struct spi_transfer xfer = {
+ 		.tx_buf = data + sizeof(u32),
+ 		.len = count - sizeof(u32),
+ 	};
+ 
+-	return nvt_ts_spi_reg_xfer(spi, data, true, &xfer, 1);
++	return nvt_ts_spi_reg_xfer(ts, data, true, &xfer, 1, false);
+ }
+ 
+ static const struct regmap_config nvt_ts_spi_regmap_conf = {
+@@ -374,10 +401,17 @@
+ 
+ static int nvt_ts_spi_probe(struct spi_device *spi)
+ {
++	struct nvt_ts_spi *ts;
+ 	struct regmap *regmap;
+ 
++	ts = devm_kzalloc(&spi->dev, sizeof(*ts), GFP_KERNEL);
++	if (!ts)
++		return -ENOMEM;
++
++	ts->spi = spi;
++
+ 	regmap =
+-		devm_regmap_init(&spi->dev, NULL, spi, &nvt_ts_spi_regmap_conf);
++		devm_regmap_init(&spi->dev, NULL, ts, &nvt_ts_spi_regmap_conf);
+ 	if (IS_ERR(regmap))
+ 		return PTR_ERR(regmap);
+ 

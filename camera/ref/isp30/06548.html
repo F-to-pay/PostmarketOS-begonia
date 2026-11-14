@@ -1,0 +1,135 @@
+<!-- MHonArc v2.6.19 -->
+<!--X-Subject: Re: [PATCH 2/5] firmware: arm_scmi: imx: Add i.MX95 CPU Protocol -->
+<!--X-From-R13: Ehqrrc Vbyyn &#60;fhqrrc.ubyynNnez.pbz> -->
+<!--X-Date: Wed, 22 Jan 2025 09:01:22 &#45;0500 (EST) -->
+<!--X-Message-Id: Z5D50Wy6R6FuxSzG@bogus -->
+<!--X-Content-Type: text/plain -->
+<!--X-Reference: 20250121&#45;imx&#45;lmm&#45;cpu&#45;v1&#45;0&#45;0eab7e073e4e@nxp.com -->
+<!--X-Reference: 20250121&#45;imx&#45;lmm&#45;cpu&#45;v1&#45;2&#45;0eab7e073e4e@nxp.com -->
+<!--X-Reference: 3b9a7392&#45;8ebe&#45;4d43&#45;a111&#45;68bb6d2f93b6@stanley.mountain -->
+<!--X-Reference: Z5Di&#45;uU52aejU&#45;U8@pluto -->
+<!--X-Reference: ac1a1ebe&#45;ef97&#45;42a2&#45;a2be&#45;529a656a7706@stanley.mountain -->
+<!--X-Head-End-->
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+                      "http://www.w3.org/TR/REC-html40/loose.dtd">
+<html lang=en>
+<head>
+<meta HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-2">
+<title>Linux-Kernel Archive: Re: [PATCH 2/5] firmware: arm_scmi: imx: Add i.MX95 CPU Protocol</title>
+<meta NAME="Author" CONTENT="Sudeep Holla &lt;sudeep.holla@xxxxxxx&gt;">
+<meta NAME="Subject" CONTENT="Re: [PATCH 2/5] firmware: arm_scmi: imx: Add i.MX95 CPU Protocol">
+</head> 
+<body BGCOLOR="#FFFFFF" TEXT="#000000">
+
+<!--X-Body-Begin-->
+<!--X-User-Header-->
+<!--X-User-Header-End-->
+<!--X-TopPNI-->
+
+
+<!--X-TopPNI-End-->
+<!--X-MsgBody-->
+<!--X-Subject-Header-Begin-->
+<h1>Re: [PATCH 2/5] firmware: arm_scmi: imx: Add i.MX95 CPU Protocol</h1>
+<strong>From: </strong>Sudeep Holla
+<br><strong>Date: </strong> Wed Jan 22 2025 - 09:01:22 EST
+<p>
+<ul>
+<li><strong>Next message: </strong> <a href="06549.html"> Binbin Wu: "Re: [PATCH 13/16] KVM: TDX: Add methods to ignore virtual apic related operation"</a>
+
+<li><strong>Previous message: </strong> <a href="06547.html"> Julien Stephan: "[PATCH v8 3/5] media: platform: mediatek: isp: add mediatek ISP3.0 sensor interface"</a>
+
+<li><strong>In reply to: </strong> <a href="06451.html"> Cristian Marussi: "Re: [PATCH 2/5] firmware: arm_scmi: imx: Add i.MX95 CPU Protocol"</a>
+
+<li><strong>Next in thread: </strong> <a href="08607.html"> kernel test robot: "Re: [PATCH 2/5] firmware: arm_scmi: imx: Add i.MX95 CPU Protocol"</a>
+
+<li><strong>Messages sorted by: </strong><a href="date.html#06548">[ date ]</a> <a href="index.html#06548">[ thread ]</a> <a href="subject.html#06548">[ subject ]</a> <a href="author.html#06548">[ author ]</a>
+</ul>
+
+<!--X-Subject-Header-End-->
+<!--X-Head-of-Message-->
+<!--X-Head-of-Message-End-->
+<!--X-Head-Body-Sep-Begin-->
+<hr NOSHADE>
+<!--X-Head-Body-Sep-End-->
+<!--X-Body-of-Message-->
+On Wed, Jan 22, 2025 at 03:41:41PM +0300, Dan Carpenter wrote:<br>
+&gt;<i> On Wed, Jan 22, 2025 at 12:22:18PM +0000, Cristian Marussi wrote:</i><br>
+&gt;<i> &gt; &gt; &gt; +struct scmi_msg_imx_cpu_attributes_out {</i><br>
+&gt;<i> &gt; &gt; &gt; +	__le32 attributes;</i><br>
+&gt;<i> &gt; &gt; &gt; +#define	CPU_MAX_NAME	16</i><br>
+&gt;<i> &gt; &gt; &gt; +	u8 name[CPU_MAX_NAME];</i><br>
+&gt;<i> &gt; &gt;</i><br>
+&gt;<i> &gt; &gt; char is always unsigned in the kernel these days but strings should</i><br>
+&gt;<i> &gt; &gt; still always be char.  Same thing in patch 1, there were a couple u8</i><br>
+&gt;<i> &gt; &gt; names.</i><br>
+&gt;<i> &gt; &gt;</i><br>
+&gt;<i> &gt;</i><br>
+&gt;<i> &gt; While it is certainly true that char is the way to go for strings and, as</i><br>
+&gt;<i> &gt; such, it is used elsewhere to hold the resource names across all SCMI</i><br>
+&gt;<i> &gt; protocols, in this context it is a field of structure representing</i><br>
+&gt;<i> &gt; exactly the layout of message reply coming from the server, and defined</i><br>
+&gt;<i> &gt; in the SCMI spec as a uint8 array, so, we have generally preferred to</i><br>
+&gt;<i> &gt; used u8 to represent such fixed size array all across the SCMI stack</i><br>
+&gt;<i> &gt; protocols implementation....</i><br>
+&gt;<i> &gt;</i><br>
+&gt;<i> &gt; .... not saying that it is necessarily completelt right, but that is the</i><br>
+&gt;<i> &gt; reason we are guilty :D</i><br>
+&gt;<i></i><br>
+&gt;<i> Fine.  I don't have intense emotions about this.</i><br>
+&gt;<i></i><br>
+&gt;<i> It does slightly bother me when we assume that the SCMI server NUL</i><br>
+&gt;<i> terminates these when we do things like:</i><br>
+&gt;<i></i><br>
+&gt;<i> 	dev_info(ph-&gt;dev, &quot;i.MX CPU: name: %s\n&quot;, out-&gt;name);</i><br>
+&gt;<i></i><br>
+<br>
+I was about to reply earlier and got distracted. This makes it even better.<br>
+I agree with Cristian that we have defined it as u8 when referring to the<br>
+payload from the SCMI platform/server. But it should be used only to extract<br>
+information from the response payload and copied to OSPM's own buffer before<br>
+accessing it like the above dev_info example.<br>
+<br>
+In short, I agree with you Dan that it shouldn't be used in OS like above.<br>
+I haven't looked at the implementation patches(just looked at the doc 3/5),<br>
+but if they need such logging, they need to copy it to some buffer in the<br>
+kernel.<br>
+<br>
+--<br>
+Regards,<br>
+Sudeep<br>
+<br>
+<br>
+
+<!--X-Body-of-Message-End-->
+<!--X-MsgBody-End-->
+<!--X-Follow-Ups-->
+<hr NOSHADE>
+<!--X-Follow-Ups-End-->
+<!--X-References-->
+
+
+
+
+
+
+
+<!--X-References-End-->
+<!--X-BotPNI-->
+<ul>
+<li><strong>Next message: </strong> <a href="06549.html"> Binbin Wu: "Re: [PATCH 13/16] KVM: TDX: Add methods to ignore virtual apic related operation"</a>
+
+<li><strong>Previous message: </strong> <a href="06547.html"> Julien Stephan: "[PATCH v8 3/5] media: platform: mediatek: isp: add mediatek ISP3.0 sensor interface"</a>
+
+<li><strong>In reply to: </strong> <a href="06451.html"> Cristian Marussi: "Re: [PATCH 2/5] firmware: arm_scmi: imx: Add i.MX95 CPU Protocol"</a>
+
+<li><strong>Next in thread: </strong> <a href="08607.html"> kernel test robot: "Re: [PATCH 2/5] firmware: arm_scmi: imx: Add i.MX95 CPU Protocol"</a>
+
+<li><strong>Messages sorted by: </strong><a href="date.html#06548">[ date ]</a> <a href="index.html#06548">[ thread ]</a> <a href="subject.html#06548">[ subject ]</a> <a href="author.html#06548">[ author ]</a>
+</ul>
+
+<!--X-BotPNI-End-->
+<!--X-User-Footer-->
+<!--X-User-Footer-End-->
+</body>
+</html>
