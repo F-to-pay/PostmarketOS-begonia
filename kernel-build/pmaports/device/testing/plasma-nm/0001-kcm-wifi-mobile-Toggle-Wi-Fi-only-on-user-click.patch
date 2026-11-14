@@ -1,0 +1,25 @@
+Subject: [PATCH] kcm_wifi_mobile: Toggle Wi-Fi only on user click
+
+The Wi-Fi switch called handler.enableWireless() from onCheckedChanged and
+then re-created the checked binding inside the same handler. The re-bind
+changes checked back to the (not yet updated) NetworkManager state, which
+fires onCheckedChanged again and sends the opposite value; when
+NetworkManager answers, the binding changes checked once more. One tap
+therefore starts an endless on/off ping-pong of WirelessEnabled writes
+(hundreds per minute), the switch ends up stuck off and the radio flaps.
+
+React to the click only, as the switch did before: onClicked is not
+emitted for programmatic changes of checked.
+
+---
+--- a/kcms/kcm_wifi_mobile/ui/main.qml	2026-11-10 08:29:30.000000000 +0100
++++ b/kcms/kcm_wifi_mobile/ui/main.qml	2026-11-14 12:31:28.496014851 +0100
+@@ -86,7 +86,7 @@
+                 id: wifiSwitch
+                 text: i18n("Wi-Fi")
+                 checked: enabledConnections.wirelessEnabled
+-                onCheckedChanged: {
++                onClicked: {
+                     handler.enableWireless(checked);
+                     checked = Qt.binding(() => enabledConnections.wirelessEnabled);
+                 }

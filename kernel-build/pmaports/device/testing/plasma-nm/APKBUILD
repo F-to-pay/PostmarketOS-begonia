@@ -1,0 +1,97 @@
+# The group tag is just to easily find this APKBUILD by some scripts for automation
+# group=kde-plasma
+maintainer="team/kde <bribbers@disroot.org>"
+pkgname=plasma-nm
+pkgver=6.8.3
+pkgrel=1
+pkgdesc="Plasma applet written in QML for managing network connections"
+# armhf blocked by qt6-qtdeclarative
+arch="all !armhf"
+url="https://kde.org/plasma-desktop/"
+license="(LGPL-2.1-only OR LGPL-3.0-only) AND LGPL-2.0-or-later"
+depends="
+	kirigami
+	kirigami-addons
+	networkmanager
+	"
+makedepends="
+	extra-cmake-modules
+	kirigami
+	kirigami-addons
+	kcmutils-dev
+	kcompletion-dev
+	kconfigwidgets-dev
+	kcoreaddons-dev
+	kdbusaddons-dev
+	kdeclarative-dev
+	ki18n-dev
+	kiconthemes-dev
+	kio-dev
+	knotifications-dev
+	kservice-dev
+	ksvg-dev
+	kwallet-dev
+	kwidgetsaddons-dev
+	kwindowsystem-dev
+	libplasma-dev
+	mobile-broadband-provider-info
+	modemmanager-qt-dev
+	networkmanager-qt-dev
+	prison-dev
+	qca-qt6-dev
+	qcoro-dev
+	qt6-qtbase-dev
+	qt6-qtdeclarative-dev
+	qt6-qtdeclarative-private-dev
+	qtkeychain-dev
+	samurai
+	solid-dev
+	"
+checkdepends="xwayland-run"
+# openconnect VPN plugin
+case "$CARCH" in
+	s390x|riscv64|loongarch64) ;; # missing qt6-qtwebengine-dev
+	x86|armv7) ;; # missing Qt6WebEngineWidgetsConfig.cmake
+	*) makedepends="$makedepends qt6-qtwebengine-dev openconnect-dev";;
+esac
+
+case "$pkgver" in
+	*.*.9*) _rel=unstable;;
+	*) _rel=stable;;
+esac
+
+subpackages="$pkgname-lang"
+_repo_url="https://invent.kde.org/plasma/plasma-nm.git"
+source="https://download.kde.org/$_rel/plasma/$pkgver/plasma-nm-$pkgver.tar.xz
+	0001-kcm-wifi-mobile-Toggle-Wi-Fi-only-on-user-click.patch
+	"
+
+build() {
+	cmake -B build -G Ninja \
+		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INSTALL_LIBDIR=lib
+	cmake --build build
+}
+
+check() {
+	# smoketests fail to find their own QML modules
+	wlheadless-run -- ctest --test-dir build -E "mobileproviderstest|kcm_(cellular_network|mobile_(hotspot|wifi|wired))_smoketest"
+}
+
+package() {
+	DESTDIR="$pkgdir" cmake --install build
+}
+
+mobile() {
+	pkgdesc="$pkgdesc (mobile KCM's)"
+	depends="$depends $pkgname"
+
+	amove usr/share/kpackage
+	amove usr/lib/qt6/plugins/kcms
+}
+
+sha512sums="
+640edf5b1a582ac15bb3abadbb409f3bb2cc174849fab8125ef1b8b20d0b52d1f0baff063f8d3e6a0d90fa4bf7caccc6150c9971216bca96b039bffaf31958ba  plasma-nm-6.8.3.tar.xz
+ab381d143e0e2a8f71e6cd117dab7b5e5236575fe70213a09b9ce33aa71bf558e860afc9f73574b1524992017a274468f3993fc74f5813065130181649b24149  0001-kcm-wifi-mobile-Toggle-Wi-Fi-only-on-user-click.patch
+"
