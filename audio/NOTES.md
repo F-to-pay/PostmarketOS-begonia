@@ -239,3 +239,9 @@ Other audio leftovers: headset microphone/top noise suppression, `aud_tdm_clk`, 
 - Not done: the PulseAudio port `analog-output-earpiece` (it should switch RCV Mux + Handset Volume 18 + ADDA_DL_GAIN 50000 and back to 2165), telephony in general.
 - **The user's decision (2026-11-13):** the earpiece is left "for testing" for now — only the manual `rcv-play.sh`, we do NOT make the PulseAudio port `analog-output-earpiece`. Come back when telephony appears or permanent routing is needed. The system settings (`ADDA_DL_GAIN` 2165, `RCV Mux` Open) at rest are the same as before the work.
 
+
+### 🎧 Jack automation fixed: event driven, now part of the begonia-port package (2026-11-14)
+- After the reinstall of 2026-11-13 the user unit `~/.config/systemd/user/begonia-jack.service` came back from the home backup and pointed at the old `~/Begonia/wifi/audio/jack-auto.sh` (not there any more): `Failed at step EXEC`, restart every 3 s, the automation did not run at all.
+- `jack-auto.sh` now waits on `alsactl monitor hw:0` (a line per control notification, `Headphone Jack` is acted upon after 0.9 s debounce) instead of polling `amixer` 3 times a second. It is installed as `/usr/bin/begonia-jack-auto`, the unit as `/usr/lib/systemd/user/begonia-jack.service` (enabled through `default.target.wants`), package `begonia-port` r4. Pulled out -> speaker 40 % (JACK_UNPLUG=mute to keep it silent).
+- The old per-user unit was moved to `~/.config/systemd/user.bak-jack/` (a unit in the home directory overrides the package one).
+- Not verified physically yet: plugging headphones in and out (the monitor was tested with another control: `alsactl monitor` takes `hw:0`, not `0`).

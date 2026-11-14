@@ -1,0 +1,4 @@
+# IMU BMI120 (mainline bmi160 driver): the default 100 Hz data-ready rate costs ~1300 wakeups and ~1200 SPI interrupts
+# per second for nothing (iio-sensor-proxy needs a few Hz for the screen rotation). Accelerometer 12.5 Hz;
+# the gyroscope cannot go below 25 Hz and its data-ready interrupt paces the whole buffer -> 25 interrupts/s.
+ACTION=="add", SUBSYSTEM=="iio", ATTR{name}=="bmi120", ATTR{in_accel_sampling_frequency}="12.5", ATTR{in_anglvel_sampling_frequency}="25"

@@ -4,8 +4,11 @@
 #   pulled out            -> hp-off (output muted). (see below about the speaker)
 #                        Default: pulled out -> speaker (with the bass filter, volume JACK_SPK_VOL, default 40%).
 #                        Silence only, no speaker: JACK_UNPLUG=mute.
-# The contact bounces on insertion/removal, so only a state unchanged for ~0.9 s is acted upon.
-# Runs as a systemd user service (begonia-jack.service): hp-on/hp-off go to amixer, spk-* to the user PulseAudio.
+# Event driven: `alsactl monitor` blocks until a control of the card changes (the jack control notifies on plug/unplug),
+# so the script costs nothing while the jack does not move (it used to poll amixer 3 times a second).
+# The contact bounces on insertion/removal, so the state is read ~0.9 s after the event and acted upon only if it changed.
+# Installed as /usr/bin/begonia-jack-auto and run by the user service begonia-jack.service
+# (hp-on/hp-off go to amixer, spk-* to the user PulseAudio).
 UNPLUG=${JACK_UNPLUG:-speaker}
 SPKVOL=${JACK_SPK_VOL:-40}
 LOG=/tmp/jack-auto.log
@@ -31,18 +34,23 @@ apply() {
 	fi
 }
 
-last=-1; cand=-1; stable=0
-while :; do
+last=-1
+check() {
+	sleep 0.9			# contact bounce
 	s=$(jack_state)
-	if [ "$s" = "$cand" ]; then
-		stable=$((stable + 1))
-	else
-		cand=$s
-		stable=0
+	if [ "$s" != "$last" ]; then
+		last=$s
+		apply "$s"
 	fi
-	if [ "$stable" -ge 3 ] && [ "$cand" != "$last" ]; then
-		last=$cand
-		apply "$cand"
-	fi
-	sleep 0.3
+}
+
+check				# the state at the start
+while :; do
+	# one line per notification of any control of the card; only the jack ones matter
+	alsactl monitor hw:0 2>/dev/null | while read -r line; do
+		case "$line" in
+		*"Headphone Jack"*) check ;;
+		esac
+	done
+	sleep 3			# the card is not there (yet) / alsactl exited: try again
 done

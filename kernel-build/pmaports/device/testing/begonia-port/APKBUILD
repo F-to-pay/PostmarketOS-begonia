@@ -4,7 +4,7 @@
 # into the pmaports package directory from FWDIR (your own backup of the phone).
 pkgname=begonia-port
 pkgver=1
-pkgrel=3
+pkgrel=5
 pkgdesc="Redmi Note 8 Pro (begonia): WiFi/BT/audio/IR integration"
 url="https://postmarketos.org"
 arch="aarch64"
@@ -41,12 +41,15 @@ source="
 	begonia-ir.conf
 	90-begonia-audio.rules
 	90-stk3310.rules
+	90-begonia-imu.rules
 	mt6785-mt6359.conf
 	mt6785-mic.conf
 	analog-output-headphones.conf
 	analog-output-speaker.conf
 	idle-shutdown.sh
 	idle-shutdown.service
+	jack-auto.sh
+	begonia-jack.service
 	mic-nc-dsp.c
 	wifi.cfg
 	txpowerctrl.cfg
@@ -68,6 +71,11 @@ package() {
 	install -Dm755 begonia-wifi.sh "$pkgdir"/usr/libexec/begonia/begonia-wifi
 	install -Dm755 begonia-audio.sh "$pkgdir"/usr/libexec/begonia/begonia-audio
 	install -Dm755 idle-shutdown.sh "$pkgdir"/usr/bin/idle-shutdown.sh
+	# 3.5 mm jack automation: a user service (needs the user's PulseAudio), enabled for everybody
+	install -Dm755 jack-auto.sh "$pkgdir"/usr/bin/begonia-jack-auto
+	install -Dm644 begonia-jack.service "$pkgdir"/usr/lib/systemd/user/begonia-jack.service
+	mkdir -p "$pkgdir"/usr/lib/systemd/user/default.target.wants
+	ln -s ../begonia-jack.service "$pkgdir"/usr/lib/systemd/user/default.target.wants/begonia-jack.service
 
 	for s in begonia-wifi begonia-audio idle-shutdown; do
 		install -Dm644 $s.service "$u"/$s.service
@@ -88,6 +96,7 @@ package() {
 	install -Dm644 begonia-ir.conf "$pkgdir"/usr/lib/modules-load.d/begonia-ir.conf
 	install -Dm644 90-begonia-audio.rules "$pkgdir"/usr/lib/udev/rules.d/90-begonia-audio.rules
 	install -Dm644 90-stk3310.rules "$pkgdir"/usr/lib/udev/rules.d/90-stk3310.rules
+	install -Dm644 90-begonia-imu.rules "$pkgdir"/usr/lib/udev/rules.d/90-begonia-imu.rules
 
 	for s in mt6785-mt6359.conf mt6785-mic.conf analog-output-headphones.conf analog-output-speaker.conf; do
 		install -Dm644 $s "$pkgdir"/usr/share/begonia/pulse/$s

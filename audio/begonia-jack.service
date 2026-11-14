@@ -1,8 +1,9 @@
 [Unit]
 Description=Begonia: 3.5 mm jack automation (headphones/speaker)
+After=pulseaudio.service
 
 [Service]
-ExecStart=/home/user/Begonia/wifi/audio/jack-auto.sh
+ExecStart=/usr/bin/begonia-jack-auto
 Restart=always
 RestartSec=3
 
