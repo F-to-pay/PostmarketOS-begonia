@@ -32,6 +32,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/fs.h>
 #include <linux/fcntl.h>
+#include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/mfd/syscon.h>
 #include <linux/module.h>
@@ -122,6 +123,7 @@
 #define BTIF_WAK			0x64
 #define BTIF_HANDSHAKE			0x6c
 #define BTIF_LSR_DR			BIT(0)
+#define BTIF_IER_RXFEN			BIT(0)	/* interrupt: the RX buffer contains data */
 #define BTIF_LSR_THRE			BIT(5)
 #define BTIF_LSR_TEMT			BIT(6)
 /* AP_DMA BTIF RX channel (vendor DT: rx-dma 0x11000c00): the same register device, the ring in RAM is written by DMA, read by the host */
@@ -217,6 +219,8 @@ struct consys {
 	void (*type_cb[8])(void *ctx, const u8 *buf, int len);	/* receivers of STP frames by type (GPS=2 etc.) */
 	void *type_ctx[8];
 	struct mutex txlock;		/* serializes the transmission of frames and ACKs over BTIF */
+	u8 *txq;			/* STP retransmit queue: 8 slots of STP_TXQ_SLOT bytes, indexed by the frame seq */
+	u16 txqlen[8];
 	struct sk_buff *rx_skb;		/* assembling H4 packets */
 	void __iomem *mcu;		/* CONN_MCU_CONFIG_BASE  0x18002000 */
 	void __iomem *top_misc_off;	/* CONN_TOP_MISC_OFF     0x180b1000 */
@@ -234,6 +238,12 @@ struct consys {
 	dma_addr_t rvff_phys;
 	u32 rx_rpt;			/* our read pointer (with the 0x10000 wrap bit) */
 	bool rxdma_on;
+	int irq;			/* BTIF interrupt (GIC SPI 138) from DT, 0 = none -> polling */
+	int irq_dma;			/* AP_DMA BTIF RX channel interrupt (GIC SPI 154) from DT, used while RX DMA is on */
+	int rx_irq_line;		/* the one that is requested while the receive thread runs */
+	bool rx_irq_on;			/* the receive thread sleeps on rx_wq and is woken by the BTIF/RX DMA interrupt */
+	bool rx_ev;
+	wait_queue_head_t rx_wq;
 	struct clk *clk_btif;
 	struct clk *clk_apdma;
 	u32 pda_addr;
@@ -974,12 +984,68 @@ struct stp_full {
 	u8 txack;	/* seq of the last frame received from the MCU */
 	u8 rxexp;	/* expected seq of the next frame from the MCU */
 	u8 rxack;	/* the last ack that came from the MCU (transmit window) */
+	u8 nunack;	/* frames sent and not yet acknowledged by the MCU (they sit in c->txq) */
+	u8 retries;	/* consecutive retransmissions without progress */
+	unsigned long tx_deadline;	/* jiffies: resend the unacknowledged frames after this */
 	int rxn;	/* bytes in rxbuf (the remainder between recv calls) */
 	u8 rxbuf[1024];	/* max. STP frame ~460 B (calibration event 0x1c6) + header/CRC */
 };
 
 #define STP_MAX_PAYLOAD	1100
+#define STP_TXQ_SLOT	(4 + STP_MAX_PAYLOAD + 2)
+#define STP_RETRY_MS	180	/* vendor MTKSTP_TX_TIMEOUT */
+#define STP_RETRY_FAST	10	/* vendor MTKSTP_RETRY_LIMIT: after that keep trying, but slowly */
 static bool stp_quiet;	/* true while hci0 runs: do not clutter dmesg with a per-frame log */
+
+/*
+ * STP retransmit (vendor stp_core.c: stp_process_rxack / stp_do_tx_timeout). Every frame we send stays in c->txq until the MCU
+ * acknowledges it. If a chunk of a frame is lost on the way (BTIF write while the MCU is waking up from sleep, WiFi toggling
+ * at the same time...), the MCU parser sits in the middle of a half-received frame and ignores everything after it forever:
+ * without this the BT link (and the WMT channel) stays dead until the next power cycle of CONNSYS.
+ */
+static void stp_tx_acked(struct consys *c, struct stp_full *st, u8 ack)
+{
+	u8 n;
+
+	mutex_lock(&c->txlock);
+	n = ((ack - (st->txseq - st->nunack)) & 7) + 1;	/* frames acknowledged by `ack` (>nunack: stale/duplicate ack) */
+	if (st->nunack && n <= st->nunack) {
+		st->nunack -= n;
+		st->retries = 0;
+		st->tx_deadline = jiffies + msecs_to_jiffies(STP_RETRY_MS);
+	}
+	mutex_unlock(&c->txlock);
+}
+
+/* no ack for STP_RETRY_MS: 4x 0x7f (resync: the MCU drops a half-received frame), then resend all unacknowledged frames */
+static void stp_tx_retry(struct consys *c, struct stp_full *st)
+{
+	static const u8 resync[4] = { 0x7f, 0x7f, 0x7f, 0x7f };
+	u8 s, n;
+
+	if (!st->nunack || time_before(jiffies, st->tx_deadline))
+		return;
+	mutex_lock(&c->txlock);
+	if (!st->nunack || time_before(jiffies, st->tx_deadline)) {
+		mutex_unlock(&c->txlock);
+		return;
+	}
+	st->retries++;
+	st->tx_deadline = jiffies + msecs_to_jiffies(STP_RETRY_MS * (st->retries > STP_RETRY_FAST ? 10 : 1));
+	dev_warn_ratelimited(c->dev, "[STP-FULL] no ack: resync + resend %u frame(s) from seq %u (try %u, MCU ack=%u)\n", st->nunack,
+			     (st->txseq - st->nunack) & 7, st->retries, st->rxack);
+	btif_wake(c);
+	btif_tx(c, resync, sizeof(resync));
+	for (n = st->nunack, s = (st->txseq - n) & 7; n; n--, s = (s + 1) & 7) {
+		u8 *f = c->txq + s * STP_TXQ_SLOT;
+
+		f[0] = (f[0] & ~7) | st->txack;		/* fresh ack of the frames received from the MCU; CRC covers the payload only */
+		f[3] = (f[0] + f[1] + f[2]) & 0xff;
+		btif_wake(c);
+		btif_tx(c, f, c->txqlen[s]);
+	}
+	mutex_unlock(&c->txlock);
+}
 
 static int stp_full_send(struct consys *c, struct stp_full *st, u8 type, const u8 *pl, int len)
 {
@@ -1001,6 +1067,14 @@ static int stp_full_send(struct consys *c, struct stp_full *st, u8 type, const u
 	if (!stp_quiet)
 		dev_info(c->dev, "[STP-FULL] TX seq=%u ack=%u type=%u len=%d: %*ph\n", st->txseq, st->txack, type, len,
 			 min(6 + len, 32), tx);
+	if (c->txq) {
+		memcpy(c->txq + st->txseq * STP_TXQ_SLOT, tx, 6 + len);
+		c->txqlen[st->txseq] = 6 + len;
+		if (!st->nunack)
+			st->tx_deadline = jiffies + msecs_to_jiffies(STP_RETRY_MS);
+		if (st->nunack < 7)
+			st->nunack++;
+	}
 	st->txseq = (st->txseq + 1) & 7;
 	btif_wake(c);
 	ret = btif_tx(c, tx, 6 + len);
@@ -1048,6 +1122,7 @@ static int stp_full_recv_t(struct consys *c, struct stp_full *st, int want_type,
 			type = (h[1] >> 4) & 7;
 			len = ((h[1] & 0x0f) << 8) | h[2];
 			st->rxack = ack;
+			stp_tx_acked(c, st, ack);
 			if (!len) {			/* header-only: ACK of our frame */
 				if (!stp_quiet)
 					dev_info(c->dev, "[STP-FULL] RX ack=%d (header only)\n", ack);
@@ -1090,11 +1165,14 @@ static int stp_full_recv_t(struct consys *c, struct stp_full *st, int want_type,
 		if (!time_before(jiffies, deadline))
 			break;
 		{
+			/* wait in slices so that a lost frame can be resent while we wait for the answer */
 			int got = btif_rx(c, buf + st->rxn, sizeof(st->rxbuf) - st->rxn,
-					  jiffies_to_msecs(deadline - jiffies), 2000);
+					  min_t(unsigned int, jiffies_to_msecs(deadline - jiffies), 50), 2000);
 
-			if (!got)
-				break;
+			if (!got) {
+				stp_tx_retry(c, st);
+				continue;	/* the deadline is checked at the top of the loop */
+			}
 			st->rxn += got;
 			if (!stp_quiet)
 				dev_info(c->dev, "[STP-FULL] RX +%d (total %d): %*ph\n", got, st->rxn, min(st->rxn, 40), buf);
@@ -1313,6 +1391,7 @@ static void stp_rx_process(struct consys *c)
 		type = (h[1] >> 4) & 7;
 		len = ((h[1] & 0x0f) << 8) | h[2];
 		st->rxack = ack;
+		stp_tx_acked(c, st, ack);
 		if (!len) {
 			pos += 4;
 			continue;
@@ -1369,6 +1448,24 @@ static void stp_rx_process(struct consys *c)
 }
 
 /* simple BTIF polling: while empty - sleep rx_poll_us..2x (TODO: BTIF IRQ, SPI 138) */
+static bool rx_irq = true;
+module_param(rx_irq, bool, 0444);
+MODULE_PARM_DESC(rx_irq, "wait for the BTIF RX interrupt instead of polling every rx_poll_us (needs interrupts in the DT node)");
+
+/* the level interrupt is masked here and unmasked by the receive thread after it has drained the FIFO */
+static irqreturn_t consys_btif_irq(int irq, void *data)
+{
+	struct consys *c = data;
+
+	if (c->rxdma_on)
+		writel(0, c->rxdma + ADMA_INT_EN);	/* RX DMA: data landed in the vFIFO */
+	else
+		writel(0, c->btif + BTIF_IER);
+	WRITE_ONCE(c->rx_ev, true);
+	wake_up(&c->rx_wq);
+	return IRQ_HANDLED;
+}
+
 static unsigned int rx_poll_us = 1000;
 module_param(rx_poll_us, uint, 0644);
 MODULE_PARM_DESC(rx_poll_us, "BTIF rx polling period when idle (us); lower = less FIFO overrun risk, more CPU");
@@ -1394,6 +1491,32 @@ static int consys_rx_thread(void *data)
 			st->rxn += got;
 			stp_rx_process(c);
 			continue;		/* while there is data - do not sleep */
+		}
+		stp_tx_retry(c, st);
+		if (c->rx_irq_on) {
+			/* nothing to read: sleep until the BTIF interrupt, but wake up in time for a retransmission */
+			/* with RX DMA a safety timeout stays even when idle, in case the DMA interrupt does not come */
+			unsigned long tmo = msecs_to_jiffies(st->nunack ? STP_RETRY_MS / 4 : c->rxdma_on ? 100 : 1000);
+			bool pending;
+
+			WRITE_ONCE(c->rx_ev, false);
+			if (c->rxdma_on) {
+				void __iomem *d = c->rxdma;
+
+				writel(ADMA_RX_INT_THRE_DONE, d + ADMA_INT_FLAG);	/* W1C, then unmask */
+				writel(ADMA_RX_INT_THRE_DONE, d + ADMA_INT_EN);
+				pending = (readl(d + ADMA_VFF_WPT) & 0x1ffff) != (c->rx_rpt & 0x1ffff);
+			} else {
+				writel(BTIF_IER_RXFEN, c->btif + BTIF_IER);
+				pending = readl(c->btif + BTIF_LSR) & BTIF_LSR_DR;
+			}
+			if (!pending)	/* otherwise the data came in before the interrupt was enabled */
+				wait_event_timeout(c->rx_wq, READ_ONCE(c->rx_ev) || kthread_should_stop(), tmo);
+			if (c->rxdma_on)
+				writel(0, c->rxdma + ADMA_INT_EN);
+			else
+				writel(0, c->btif + BTIF_IER);
+			continue;
 		}
 		{
 			unsigned int us = rx_poll_us ? rx_poll_us : 50;
@@ -1430,10 +1553,25 @@ static int consys_rx_get_c(struct consys *c)
 				c->stp->rxn += drained;
 			}
 		}
+		c->rx_irq_line = c->rxdma_on ? c->irq_dma : c->irq;
+		if (rx_irq && c->rx_irq_line > 0) {
+			if (c->rxdma_on)
+				writel(0, c->rxdma + ADMA_INT_EN);
+			else
+				writel(0, c->btif + BTIF_IER);
+			if (request_irq(c->rx_irq_line, consys_btif_irq, 0, c->rxdma_on ? "consys-rxdma" : "consys-btif", c))
+				dev_warn(c->dev, "RX irq %d unavailable, polling\n", c->rx_irq_line);
+			else
+				c->rx_irq_on = true;
+		}
 		c->rx_task = kthread_run(consys_rx_thread, c, "consys-rx");
 		if (IS_ERR(c->rx_task)) {
 			ret = PTR_ERR(c->rx_task);
 			c->rx_task = NULL;
+			if (c->rx_irq_on) {
+				free_irq(c->rx_irq_line, c);
+				c->rx_irq_on = false;
+			}
 			stp_quiet = false;
 			if (c->rxdma_on)
 				btif_rxdma_stop(c);
@@ -1452,6 +1590,11 @@ static void consys_rx_put_c(struct consys *c)
 	if (c->rx_users > 0 && --c->rx_users == 0 && c->rx_task) {
 		kthread_stop(c->rx_task);
 		c->rx_task = NULL;
+		if (c->rx_irq_on) {
+			free_irq(c->rx_irq_line, c);
+			c->rx_irq_on = false;
+		}
+		writel(0, c->btif + BTIF_IER);
 		if (c->rxdma_on)
 			btif_rxdma_stop(c);	/* back to PIO for the synchronous WMT/STP exchanges */
 		stp_quiet = false;
@@ -1493,10 +1636,10 @@ static int consys_stp_send_c(struct consys *c, u8 type, const u8 *buf, int len)
 
 	if (!st || !c->rx_task)
 		return -ENODEV;
-	for (i = 0; i < 300 && ((st->txseq - ((st->rxack + 1) & 7)) & 7) >= 4; i++)
+	for (i = 0; i < 300 && st->nunack >= 4; i++)
 		usleep_range(1000, 2000);
 	if (i == 300)
-		dev_warn_ratelimited(c->dev, "STP tx window stuck (txseq=%u rxack=%u)\n", st->txseq, st->rxack);
+		dev_warn_ratelimited(c->dev, "STP tx window stuck (unacked=%u txseq=%u rxack=%u)\n", st->nunack, st->txseq, st->rxack);
 	return stp_full_send(c, st, type, buf, len);
 }
 
@@ -1685,11 +1828,11 @@ static int consys_hci_send(struct hci_dev *hdev, struct sk_buff *skb)
 	}
 	buf[0] = hci_skb_pkt_type(skb);
 	memcpy(buf + 1, skb->data, skb->len);
-	/* STP window: no more than 4 unacknowledged frames (retransmit is not implemented) */
-	for (i = 0; i < 300 && ((st->txseq - ((st->rxack + 1) & 7)) & 7) >= 4; i++)
+	/* STP window: no more than 4 unacknowledged frames (the rx thread resends them if the MCU is silent) */
+	for (i = 0; i < 300 && st->nunack >= 4; i++)
 		usleep_range(1000, 2000);
 	if (i == 300)
-		dev_warn_ratelimited(c->dev, "STP tx window stuck (txseq=%u rxack=%u)\n", st->txseq, st->rxack);
+		dev_warn_ratelimited(c->dev, "STP tx window stuck (unacked=%u txseq=%u rxack=%u)\n", st->nunack, st->txseq, st->rxack);
 	ret = stp_full_send(c, st, 0, buf, skb->len + 1);
 	switch (hci_skb_pkt_type(skb)) {
 	case HCI_COMMAND_PKT: hdev->stat.cmd_tx++; break;
@@ -2418,9 +2561,19 @@ static int consys_probe(struct platform_device *pdev)
 	if (!c)
 		return -ENOMEM;
 	mutex_init(&c->txlock);
+	c->txq = devm_kmalloc(dev, 8 * STP_TXQ_SLOT, GFP_KERNEL);
+	if (!c->txq)
+		return -ENOMEM;
 	mutex_init(&c->rx_lock);
 	mutex_init(&c->wmt_lock);
 	init_completion(&c->wmt_done);
+	init_waitqueue_head(&c->rx_wq);
+	c->irq = platform_get_irq_byname_optional(pdev, "btif");
+	if (c->irq < 0)
+		c->irq = 0;
+	c->irq_dma = platform_get_irq_byname_optional(pdev, "rxdma");
+	if (c->irq_dma < 0)
+		c->irq_dma = 0;
 	g_cs = c;
 	c->dev = dev;
 	platform_set_drvdata(pdev, c);

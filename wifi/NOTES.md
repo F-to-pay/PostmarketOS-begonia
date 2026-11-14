@@ -355,3 +355,11 @@ Fix (gen4m-port/port.py): as the first step exitWlan() calls hifAxiRemove() (thi
 Check (wlan-reload.sh): rmmod OK, 0 oops, insmod again -> FW_START EVT success, Ready bit, wlan0/wlan1, NetworkManager reconnected. The WiFi function in the MCU does not need to be switched off for a reload.
 Debugging WiFi now: sudo sh ~/wlan-reload.sh (no reboot). consys-bringup can still be updated only with a reboot (wlan and hci0 hold it).
 
+
+## ✅ 2026-11-14: BT/WiFi «ломаются» при переключении - причина и лечение (STP retransmit)
+- Симптом: после выкл/вкл WiFi/BT (и даже сразу после загрузки) hci0 сыпал `Opcode 0x0c13 failed: -110`, `STP tx window stuck`, `[WMT] NO WMT EVENT`; rfkill block/unblock BT не помогал, жил только ребут. WiFi (AXI) при этом жив.
+- Причина: потеря части STP-кадра при записи в BTIF (большие HCI-команды: Write Local Name 248 Б, EIR 241 Б; после загрузки - всегда первые, при переключении WiFi - случайно). Парсер MCU ждёт остаток кадра и игнорирует всё дальнейшее, MCU каждые ~360 мс повторяет свой последний кадр (`unexpected seq N`), наши кадры не принимает. Хостового retransmit не было (TODO с 2026-11-11).
+- Лечение (консис-драйвер, коммит «Retransmit unacknowledged STP frames», патч 0019): очередь отправленных кадров `c->txq` (8 слотов), по таймауту 180 мс без ack - `7f 7f 7f 7f` (resync) + повтор неподтверждённых, как `stp_do_tx_timeout` у вендора; окно считается по числу неподтверждённых (`st->nunack`), а не по `rxack` (он врал сразу после старта). В dmesg: `[STP-FULL] no ack: resync + resend ...`.
+- Проверка: на каждой загрузке теперь 3 retransmit-а (seq 7,0,1) и всё поднимается; стресс 17 циклов (nmcli radio wifi off/on параллельно с `bluetoothctl system-alias`) + 3 цикла `rfkill block/unblock all` - 0 ошибок.
+- Не выяснено: почему теряются именно первые большие кадры (подозрение: MCU не успевает проснуться после WAK, `btif_wake()` ждёт 0.5-1 мс). Можно попробовать увеличить задержку/слать кадр порциями.
+- Установлено на телефон вручную в `/lib/modules/6.16.4/.../consys-bringup.ko.zst` (оригинал: `/var/lib/begonia/backup/consys-bringup.ko.zst.orig`); пакет ядра пересобрать (r6) с патчем 0019, чтобы это закрепилось.

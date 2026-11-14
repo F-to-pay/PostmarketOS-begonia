@@ -28,6 +28,10 @@
 		reg = <0 0x18002000 0 0x1000>,	/* CONN_MCU_CONFIG_BASE */
 		      <0 0x180b1000 0 0x1000>;	/* CONN_TOP_MISC_OFF_BASE */
 		reg-names = "mcu_cfg", "top_misc_off";
+		/* BTIF (AP side of the link to the MCU, regs 0x1100c000) and its AP_DMA RX channel (0x11000c00): vendor btif@1100c000, level low */
+		interrupts = <GIC_SPI 138 IRQ_TYPE_LEVEL_LOW>,
+			     <GIC_SPI 154 IRQ_TYPE_LEVEL_LOW>;
+		interrupt-names = "btif", "rxdma";
 
 		power-domains = <&spm MT6785_POWER_DOMAIN_CONN>;
 		clocks = <&infracfg CLK_INFRA_CCIF4_AP>;
